@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torta ACMG — Asistente Guiado & Velocímetro Bayesiano</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="stylesheet" href="torta_style.css">
+    <style>
+        /* Layout Guiado Progresivo con Velocímetro Lateral */
+        .wizard-layout {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .wizard-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Velocímetro Bayesiano Lateral Fijo */
+        .speedometer-sidebar {
+            position: sticky;
+            top: 24px;
+            height: fit-content;
+        }
+
+        .speedometer-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glow);
+            border-radius: 20px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+
+        .speedometer-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        /* Gauge Arc SVG */
+        .gauge-container {
+            position: relative;
+            width: 200px;
+            height: 110px;
+            margin: 0 auto;
+        }
+
+        .gauge-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .gauge-needle {
+            transition: transform 0.5s ease;
+            transform-origin: 100px 95px;
+        }
+
+        .gauge-score {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 30%, var(--neon-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-top: -10px;
+        }
+
+        /* Pasos del Wizard */
+        .wizard-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glow);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .wizard-step.hidden {
+            display: none;
+        }
+
+        .step-header-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(6, 182, 212, 0.12);
+            color: var(--neon-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .step-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        /* Opciones visuales tipo tarjetas */
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+        }
+
+        .option-card {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-glow);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .option-card:hover {
+            border-color: var(--neon-cyan);
+            transform: translateY(-2px);
+        }
+
+        .option-card.selected {
+            border-color: var(--neon-cyan);
+            background: rgba(6, 182, 212, 0.15);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+        }
+
+        .option-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        .option-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Predictor Custom Card */
+        .predictor-box {
+            background: rgba(167, 139, 250, 0.08);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .predictor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .predictor-select, .predictor-input, .crit-strength-select {
+            width: 100%;
+            padding: 9px 14px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 8px;
+            color: var(--neon-cyan);
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.15);
+            transition: all 0.2s ease;
+        }
+
+        .predictor-select:hover, .crit-strength-select:hover {
+            border-color: #38bdf8;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+        }
+
+        .btn-next, .btn-report {
+            background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%);
+            color: #ffffff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(6, 182, 212, 0.35);
+            transition: all 0.2s ease;
+        }
+
+        .btn-next:hover, .btn-report:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(6, 182, 212, 0.55);
+        }
+
+        /* Tarjeta bloqueada por regla molecular o exclusión en el Paso 3 */
+        .criterion-item-card.disabled-rule {
+            opacity: 0.35 !important;
+            pointer-events: none !important;
+            filter: grayscale(0.95) !important;
+            position: relative !important;
+            background: rgba(15, 23, 42, 0.6) !important;
+        }
+
+        .criterion-item-card.disabled-rule::after {
+            content: "Bloqueado por Consecuencia Molecular";
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(244, 63, 94, 0.2);
+            color: var(--neon-rose);
+            border: 1px solid rgba(244, 63, 94, 0.4);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        /* Modal Informe Printable */
+        .report-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(7, 10, 18, 0.85);
+            backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 2000; opacity: 0; pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .report-modal-overlay.active {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        .report-paper {
+            background: #ffffff;
+            color: #0f172a;
+            width: 90%; max-width: 800px; max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .report-header {
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+
+        .report-header h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.6rem; color: #0f172a; font-weight: 800;
+        }
+
+        .report-table {
+            width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.9rem;
+        }
+
+        .report-table th, .report-table td {
+            border: 1px solid #cbd5e1; padding: 10px 14px; text-align: left;
+        }
+
+        .report-table th {
+            background-color: #f1f5f9; color: #0f172a; font-weight: 700;
+        }
+
+        .report-verdict-badge {
+            display: inline-block; padding: 6px 16px; border-radius: 9999px;
+            font-weight: 800; font-size: 1.1rem; color: #ffffff;
+        }
+
+        .badge-pathogenic { background: #e11d48; }
+        .badge-likely-pathogenic { background: #d97706; }
+        .badge-vus { background: #0284c7; }
+        .badge-likely-benign { background: #059669; }
+        .badge-benign { background: #16a34a; }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .criterion-item-card.disabled-rule {
+            opacity: 0.42;
+            cursor: not-allowed;
+            filter: grayscale(0.5);
+            position: relative;
+        }
+        .criterion-item-card.disabled-rule:hover::after {
+            content: attr(data-disabled-reason);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15,23,42,0.97);
+            color: #fbbf24;
+            border: 1px solid rgba(251,191,36,0.4);
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            line-height: 1.4;
+            white-space: normal;
+            max-width: 280px;
+            width: max-content;
+            z-index: 999;
+            pointer-events: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        @media print {
+            body * { visibility: hidden; }
+            .report-paper, .report-paper * { visibility: visible; }
+            .report-paper { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; padding: 0; box-shadow: none; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- TOAST DE CONFLICTOS ACMG -->
+    <div id="conflictToastContainer" style="position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; max-width:540px; width:90%;"></div>
+
+    <div class="torta-container">
+        <!-- HEADER -->
+        <header class="torta-header">
+            <div class="brand-title">
+                <i class="fa-solid fa-gauge-high"></i>
+                <div>
+                    <h1>Guía Guiada & Clasificador ACMG</h1>
+                    <p class="brand-subtitle">Evaluación paso a paso con velocímetro bayesiano y reporte final</p>
+                </div>
+            </div>
+            <div class="header-badges" style="display:flex; gap:10px;">
+                <button class="btn-reset" onclick="window.tortaApp.resetAllSelections()" style="background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.4); color:var(--neon-rose); padding:8px 14px; border-radius:12px; font-weight:700; cursor:pointer;">
+                    <i class="fa-solid fa-rotate-left"></i> Limpiar Todo
+                </button>
+                <button class="btn-report" onclick="window.tortaApp.openReportModal()">
+                    <i class="fa-solid fa-file-invoice"></i> Generar Informe PDF
+                </button>
+            </div>
+        </header>
+
+        <!-- WIZARD LAYOUT -->
+        <div class="wizard-layout">
+            <!-- LEFT MAIN CONTENT: PROGRESIVE WIZARD STEPS -->
+            <div class="wizard-main">
+
+                <!-- PASO 0: DATOS DE LA VARIANTE & GEN -->
+                <div class="wizard-step" id="step0">
+                    <div class="step-header-badge"><i class="fa-solid fa-0"></i> PASO 0 — IDENTIFICACIÓN DE LA VARIANTE</div>
+                    <h2 class="step-title">Gen, Nomenclatura HGVS & Modelo de Herencia</h2>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:14px;">
+                        Ingrese los datos básicos de la variante para personalizar el informe y condicionar reglas clínicas:
+                    </p>
+
+                    <div class="predictor-grid" style="margin-bottom:14px;">
+                        <div>
+                            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700">Gen (ej. SCN1A)</label>
+                            <input type="text" id="inputGene" class="predictor-input" placeholder="ej. KCNQ1">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700">HGVS (c. / p.)</label>
+                            <input type="text" id="inputHGVS" class="predictor-input" placeholder="c.4243C>T (p.Arg1415Ter)">
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:16px;">
+                        <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700">Modelo de Herencia Clínica</label>
+                        <select id="selectInheritance" class="predictor-select" onchange="window.tortaApp.setInheritanceModel(this.value)">
+                            <option value="AD">Autosómico Dominante (AD)</option>
+                            <option value="AR">Autosómico Recesivo (AR)</option>
+                            <option value="XL">Ligado al X (XL)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn-next" onclick="window.tortaApp.showStep(1)">Continuar a Consecuencia Molecular <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+
+                <!-- PASO 1: CONSECUENCIA MOLECULAR -->
+                <div class="wizard-step hidden" id="step1">
+                    <div class="step-header-badge"><i class="fa-solid fa-1"></i> PASO 1</div>
+                    <h2 class="step-title">¿Cuál es el Tipo de Consecuencia Molecular de la variante?</h2>
+
+                    <div class="option-grid">
+                        <div class="option-card selected" onclick="window.tortaApp.setConsequence('missense', this)">
+                            <div class="option-title">Missense</div>
+                            <div class="option-desc">Cambio de aminoácido en la secuencia proteica.</div>
+                        </div>
+
+                        <div class="option-card" onclick="window.tortaApp.setConsequence('lof', this)">
+                            <div class="option-title">Truncante / LOF</div>
+                            <div class="option-desc">Nonsense, Frameshift o Splicing canónico +/-1,2.</div>
+                        </div>
+
+                        <div class="option-card" onclick="window.tortaApp.setConsequence('synonymous', this)">
+                            <div class="option-title">Sinónima / Silent</div>
+                            <div class="option-desc">Sin cambio de aminoácido.</div>
+                        </div>
+
+                        <div class="option-card" onclick="window.tortaApp.setConsequence('inframe', this)">
+                            <div class="option-title">Indel Inframe / Stop-Loss</div>
+                            <div class="option-desc">Inserción/deleción sin alteración de marco de lectura.</div>
+                        </div>
+                    </div>
+
+                    <button class="btn-next" onclick="window.tortaApp.showStep(2)">Continuar a Frecuencia Poblacional <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+
+                <!-- PASO 2: FRECUENCIA POBLACIONAL -->
+                <div class="wizard-step hidden" id="step2">
+                    <div class="step-header-badge"><i class="fa-solid fa-2"></i> PASO 2 — FRECUENCIA POBLACIONAL</div>
+                    <h2 class="step-title">3. Frecuencia en Población (gnomAD / TOPMed)</h2>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:14px;">
+                        Seleccione los criterios poblacionales aplicables según los umbrales de frecuencia (MAF):
+                    </p>
+                    <div class="criteria-list" id="list-frequency"></div>
+                    <button class="btn-next" onclick="window.tortaApp.showStep(3)">Continuar a Efecto Molecular <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+
+                <!-- PASO 3: EFECTO MOLECULAR & IN SILICO -->
+                <div class="wizard-step hidden" id="step3">
+                    <div class="step-header-badge"><i class="fa-solid fa-3"></i> PASO 3 — EFECTO MOLECULAR</div>
+                    <h2 class="step-title">1. Efecto Molecular & Predictores In Silico</h2>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:14px;">
+                        Seleccione los criterios moleculares o calibre la evaluación in silico computacional (PP3 / BP4):
+                    </p>
+                    <!-- Banner de alerta cap PP3+PM1 (visible dinámicamente) -->
+                    <div id="capPP3PM1Banner" style="display:none; background:rgba(251,191,36,0.12); border:1px solid rgba(251,191,36,0.5); border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:0.8rem; color:#fbbf24; font-weight:600; line-height:1.5;">
+                        ⚠️ <strong>Cap PP3 + PM1 activo:</strong> La suma de PP3 y PM1 excede el techo de <strong>+4 pts (Strong)</strong>.
+                        PP3 se recortará automáticamente al calcular. (PP3-BP4.pdf §25)<br>
+                        <span id="capPP3PM1Detail" style="font-weight:400; color:#fde68a;"></span>
+                    </div>
+
+                    <!-- Panel Interactivo PP3 / BP4 (cerrado por defecto, toggle en header) -->
+                    <div class="predictor-interactive-panel" id="pp3InteractivePanel" style="background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.3); border-radius:14px; margin-bottom:18px; overflow:hidden;">
+
+                        <!-- Header clickable para abrir/cerrar -->
+                        <div id="pp3PanelHeader" onclick="window.tortaApp.togglePP3Panel()" style="display:flex; justify-content:space-between; align-items:center; padding:14px 18px; cursor:pointer; user-select:none;">
+                            <span style="font-weight:700; color:var(--neon-purple); font-size:0.95rem; display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-calculator"></i>
+                                <span id="pp3PanelTitle">Calculadora In Silico PP3 / BP4 (ClinGen SVI 2025)</span>
+                            </span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <!-- Botón ? para tabla de umbrales -->
+                                <button type="button" id="pp3TableToggleBtn"
+                                    onclick="event.stopPropagation(); window.tortaApp.togglePP3Table()"
+                                    style="width:24px;height:24px;border-radius:50%;background:rgba(167,139,250,0.2);border:1px solid rgba(167,139,250,0.5);color:var(--neon-purple);font-size:0.8rem;font-weight:900;cursor:pointer;line-height:1;display:none;">
+                                    ?
+                                </button>
+                                <i id="pp3PanelChevron" class="fa-solid fa-chevron-down" style="color:var(--neon-purple); font-size:0.85rem; transition:transform 0.25s;"></i>
+                            </div>
+                        </div>
+
+                        <!-- Contenido colapsable -->
+                        <div id="pp3PanelBody" style="display:none; padding:0 18px 18px 18px; border-top:1px solid rgba(167,139,250,0.2);">
+
+                            <!-- Selector de predictor (dinámico según variante) -->
+                            <div id="pp3SelectorSection" style="padding-top:14px;">
+                                <div class="predictor-grid">
+                                    <div>
+                                        <label style="font-size:0.75rem; color:var(--text-muted)">Predictor</label>
+                                        <select id="predictorSelect" class="predictor-select"></select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.75rem; color:var(--text-muted)" id="sliderLabel">Valor Obtenido</label>
+                                        <input type="number" id="revelInput" class="predictor-input" min="0" max="1" step="0.001" value="0.500">
+                                    </div>
+                                </div>
+                                <input type="range" id="revelSlider" class="revel-slider" min="0" max="1" step="0.001" value="0.500" style="margin-top:12px">
+                                <div class="revel-result-bar" style="margin-top:12px">
+                                    <span>Resultado: <strong class="revel-badge" id="revelGrade">Indeterminado (0p)</strong></span>
+                                    <span style="font-size:1.1rem; font-weight:800; color:var(--neon-cyan)" id="revelPoints">0 pts</span>
+                                </div>
+                            </div>
+
+                            <!-- Tabla de umbrales SVI 2025 (colapsable con ?) -->
+                            <div id="pp3ThresholdTable" style="display:none; margin-top:14px; border-top:1px solid rgba(167,139,250,0.2); padding-top:12px; overflow-x:auto;">
+                                <p style="font-size:0.72rem; font-weight:700; color:var(--neon-purple); margin-bottom:8px;"><i class="fa-solid fa-table"></i> Umbrales por Predictor — ClinGen SVI 2025</p>
+                                <table style="width:100%; border-collapse:collapse; font-size:0.7rem; text-align:center;">
+                                    <thead>
+                                        <tr style="background:rgba(167,139,250,0.15);">
+                                            <th style="padding:5px 8px; text-align:left; color:var(--text-muted); border-bottom:1px solid rgba(255,255,255,0.08);">Predictor</th>
+                                            <th style="padding:5px 4px; color:#f87171; border-bottom:1px solid rgba(255,255,255,0.08);">BP4 Strong</th>
+                                            <th style="padding:5px 4px; color:#fca5a5; border-bottom:1px solid rgba(255,255,255,0.08);">BP4 Mod</th>
+                                            <th style="padding:5px 4px; color:#fcd34d; border-bottom:1px solid rgba(255,255,255,0.08);">BP4 Supp</th>
+                                            <th style="padding:5px 4px; color:#a3e635; border-bottom:1px solid rgba(255,255,255,0.08);">Indeterm.</th>
+                                            <th style="padding:5px 4px; color:#86efac; border-bottom:1px solid rgba(255,255,255,0.08);">PP3 Supp</th>
+                                            <th style="padding:5px 4px; color:#4ade80; border-bottom:1px solid rgba(255,255,255,0.08);">PP3 Mod</th>
+                                            <th style="padding:5px 4px; color:var(--neon-cyan); border-bottom:1px solid rgba(255,255,255,0.08);">PP3 Strong</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody style="color:var(--text-secondary);">
+                                        <tr><td style="text-align:left;padding:4px 8px;font-weight:700;color:var(--text-primary)">BayesDel</td><td>≤ −0.520</td><td>[−0.519,−0.180]</td><td>[−0.179,0.129]</td><td>—</td><td>[0.130,0.269]</td><td>[0.270,0.499]</td><td>≥ 0.500</td></tr>
+                                        <tr style="background:rgba(255,255,255,0.02)"><td style="text-align:left;padding:4px 8px;font-weight:700;color:var(--text-primary)">MutPred2</td><td>≤ 0.010</td><td>[0.011,0.197]</td><td>[0.198,0.391]</td><td>[0.392,0.736]</td><td>[0.737,0.828]</td><td>[0.829,0.931]</td><td>≥ 0.932</td></tr>
+                                        <tr><td style="text-align:left;padding:4px 8px;font-weight:700;color:var(--text-primary)">REVEL</td><td>≤ 0.016</td><td>[0.017,0.183]</td><td>[0.184,0.290]</td><td>[0.291,0.643]</td><td>[0.644,0.772]</td><td>[0.773,0.931]</td><td>≥ 0.932</td></tr>
+                                        <tr style="background:rgba(255,255,255,0.02)"><td style="text-align:left;padding:4px 8px;font-weight:700;color:var(--text-primary)">VEST4</td><td>≤ 0.077</td><td>[0.078,0.449]</td><td>[0.450,0.763]</td><td>—</td><td>[0.764,0.860]</td><td>[0.861,0.964]</td><td>≥ 0.965</td></tr>
+                                        <tr><td style="text-align:left;padding:4px 8px;font-weight:700;color:var(--text-primary)">AlphaMissense</td><td>≤ 0.070</td><td>[0.071,0.169]</td><td>[0.170,0.791]</td><td>—</td><td>[0.792,0.905]</td><td>[0.906,0.989]</td><td>≥ 0.990</td></tr>
+                                        <tr style="background:rgba(255,255,255,0.02)"><td style="text-align:left;padding:4px 8px;font-weight:700;color:var(--text-primary)">ESM1b (LLR)</td><td>≥ 8.8</td><td>[−6.3,8.7]</td><td>[−10.6,−6.4]</td><td>[−12.0,−10.7]</td><td>[−12.1,−10.7]</td><td>[−23.9,−12.2]</td><td>≤ −24.0</td></tr>
+                                        <tr><td style="text-align:left;padding:4px 8px;font-weight:700;color:var(--text-primary)">VARITY_R</td><td>≤ 0.036</td><td>[0.037,0.116]</td><td>[0.117,0.251]</td><td>[0.252,0.674]</td><td>[0.675,0.841]</td><td>[0.842,0.964]</td><td>≥ 0.965</td></tr>
+                                        <tr style="background:rgba(255,255,255,0.02)"><td style="text-align:left;padding:4px 8px;font-weight:700;color:#38bdf8">SpliceAI</td><td colspan="2" style="color:#94a3b8;">(solo splicing)</td><td>&lt; 0.10</td><td>[0.10,0.19]</td><td>[0.20,0.49]</td><td>[0.50,0.79]</td><td style="color:var(--neon-cyan)">≥ 0.80</td></tr>
+                                    </tbody>
+                                </table>
+                                <p style="font-size:0.67rem; color:var(--text-muted); margin-top:6px;">Fuente: ClinGen SVI Recommendations for Computational Evidence (2025)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="criteria-list" id="list-effect"></div>
+                    <button class="btn-next" onclick="window.tortaApp.showStep(4)">Continuar a Estudios Funcionales <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+
+                <!-- PASO 4: ESTUDIOS FUNCIONALES -->
+                <div class="wizard-step hidden" id="step4">
+                    <div class="step-header-badge"><i class="fa-solid fa-4"></i> PASO 4 — ESTUDIOS FUNCIONALES</div>
+                    <h2 class="step-title">2. Ensayos Funcionales (PS3 / BS3)</h2>
+                    <div class="criteria-list" id="list-functional"></div>
+                    <button class="btn-next" onclick="window.tortaApp.showStep(5)">Continuar a Segregación & Fenotipo <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+
+                <!-- PASO 5: SEGREGACIÓN Y FENOTIPO -->
+                <div class="wizard-step hidden" id="step5">
+                    <div class="step-header-badge"><i class="fa-solid fa-5"></i> PASO 5 — SEGREGACIÓN & FENOTIPO</div>
+                    <h2 class="step-title">4. Segregación Familiar & Datos Clínicos</h2>
+
+                    <!-- Botón para abrir modal PP1 -->
+                    <button type="button" onclick="window.tortaApp.openPP1Modal()" style="display:flex; align-items:center; gap:10px; width:100%; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.4); border-radius:14px; padding:16px 20px; cursor:pointer; margin-bottom:18px; text-align:left; transition:background 0.2s;" onmouseover="this.style.background='rgba(245,158,11,0.14)'" onmouseout="this.style.background='rgba(245,158,11,0.08)'">
+                        <i class="fa-solid fa-users-rectangle" style="font-size:1.4rem; color:var(--neon-amber);"></i>
+                        <div>
+                            <div style="font-weight:700; color:var(--neon-amber); font-size:0.95rem;">Calculadora ClinGen Co-segregación 2024</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">PP1 / PP4 / BS4 — Haz clic para abrir la calculadora guiada por pasos</div>
+                        </div>
+                        <div id="pp1ResultBadge" style="margin-left:auto; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:6px 12px; text-align:center; min-width:90px;">
+                            <div style="font-size:0.65rem; color:var(--text-muted);">Resultado</div>
+                            <div id="pp1BadgeTotal" style="font-size:1.1rem; font-weight:900; color:var(--neon-amber);">--</div>
+                            <div id="pp1BadgeCode" style="font-size:0.62rem; color:var(--text-muted);">Sin calcular</div>
+                        </div>
+                    </button>
+
+
+                    <div class="criteria-list" id="list-segregation"></div>
+                    <button class="btn-next" onclick="window.tortaApp.showStep(6)">Continuar a Variantes De Novo <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+
+                <!-- PASO 6: VARIANTES DE NOVO -->
+                <div class="wizard-step hidden" id="step6">
+                    <div class="step-header-badge"><i class="fa-solid fa-6"></i> PASO 6 — VARIANTES DE NOVO</div>
+                    <h2 class="step-title">5. Variantes De Novo (PS2 / PM6)</h2>
+                    <div class="criteria-list" id="list-denovo"></div>
+                    <button class="btn-next" onclick="window.tortaApp.showStep(7)" style="margin-top:16px;">Ver Rueda Final & Veredicto Integrado <i class="fa-solid fa-circle-nodes"></i></button>
+                </div>
+
+                <!-- PASO 7: RUEDA TORTA ACMG FINAL Y RESULTADOS -->
+                <div class="wizard-step hidden" id="step7">
+                    <div class="step-header-badge"><i class="fa-solid fa-flag-checkered"></i> RESULTADO FINAL</div>
+                    <h2 class="step-title">Rueda de Evidencia "Torta ACMG" & Veredicto Integrado</h2>
+
+                    <div class="svg-container">
+                        <svg id="acmgWheelSvg"></svg>
+                    </div>
+                    <div class="wheel-legend" id="wheelLegend"></div>
+
+                    <!-- Botones de Acción al lado de la Torta -->
+                    <div style="display:flex; gap:12px; margin-top:20px; justify-content:center; flex-wrap:wrap;">
+                        <button class="btn-report" onclick="window.tortaApp.openReportModal()">
+                            <i class="fa-solid fa-file-pdf"></i> Generar Informe PDF
+                        </button>
+                        <button class="btn-reset" onclick="window.tortaApp.resetAllSelections()" style="background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.4); color:var(--neon-rose); padding:10px 18px; border-radius:12px; font-weight:700; cursor:pointer;">
+                            <i class="fa-solid fa-trash-can"></i> Limpiar Todo
+                        </button>
+                    </div>
+
+                    <div class="criterion-info-card" id="criterionInfoCard" style="margin-top:20px;">
+                        <div class="info-card-header">
+                            <span class="info-code" id="infoCode">Selecciona un criterio</span>
+                            <span class="info-category" id="infoCategory">TORTA ACMG</span>
+                        </div>
+                        <h3 class="info-title-full" id="infoTitleFull">Explora la evidencia en el gráfico</h3>
+                        <p class="info-desc" id="infoDesc">
+                            Pasa el cursor o haz clic en cualquier sector para ver detalles y literatura en PDF.
+                        </p>
+                        <div class="info-papers-section">
+                            <div class="info-papers-title"><i class="fa-solid fa-file-pdf"></i> Literatura Asociada:</div>
+                            <div class="info-papers" id="infoPapers"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT SIDEBAR: VELOCÍMETRO BAYESIANO FIJO -->
+            <div class="speedometer-sidebar">
+                <div class="speedometer-card">
+                    <div class="speedometer-title">Velocímetro Bayesiano</div>
+
+                    <!-- Gauge SVG -->
+                    <div class="gauge-container">
+                        <svg class="gauge-svg" viewBox="0 0 200 120">
+                            <!-- Arc Background -->
+                            <path d="M 20 95 A 80 80 0 0 1 180 95" fill="none" stroke="#1e293b" stroke-width="18" stroke-linecap="round"/>
+                            <!-- Color Zones -->
+                            <path d="M 20 95 A 80 80 0 0 1 50 42" fill="none" stroke="#16a34a" stroke-width="18"/>
+                            <path d="M 50 42 A 80 80 0 0 1 85 20" fill="none" stroke="#059669" stroke-width="18"/>
+                            <path d="M 85 20 A 80 80 0 0 1 115 20" fill="none" stroke="#0284c7" stroke-width="18"/>
+                            <path d="M 115 20 A 80 80 0 0 1 150 42" fill="none" stroke="#d97706" stroke-width="18"/>
+                            <path d="M 150 42 A 80 80 0 0 1 180 95" fill="none" stroke="#e11d48" stroke-width="18"/>
+
+                            <!-- Needle -->
+                            <g class="gauge-needle" id="gaugeNeedle" style="transform: rotate(-90deg);">
+                                <polygon points="100,25 96,95 104,95" fill="#ffffff" />
+                                <circle cx="100" cy="95" r="8" fill="var(--neon-cyan)"/>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <div class="gauge-score" id="totalPoints">0 pts</div>
+                    <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">Puntuación Total Acumulada</div>
+
+                    <div class="acmg-box" style="margin-top:12px; padding:12px;">
+                        <span class="verdict-title" style="font-size:0.75rem;">Veredicto Bayesiano</span>
+                        <h3 class="verdict-result-text verdict-vus" id="verdictText" style="font-size:0.95rem; margin-top:4px;">VUS</h3>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Prob. Posteriori: <strong id="posteriorProb">0.10</strong></div>
+                    </div>
+
+                    <div style="margin-top:16px; width:100%;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; display:block; margin-bottom:6px">Criterios Acumulados:</span>
+                        <div class="active-criteria-tags" id="activeTagsContainer">
+                            <span style="color:var(--text-muted); font-size:0.8rem">Sin criterios</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE INFORME INTERACTIVO / IMPRIMIBLE -->
+    <div class="report-modal-overlay" id="reportModal">
+        <div class="report-paper">
+            <div class="report-header">
+                <div>
+                    <h2>INFORME DE CLASIFICACIÓN DE VARIANTE</h2>
+                    <p style="color:#64748b; font-size:0.85rem">Marco Bayesiano ACMG/AMP & Consenso ClinGen (Tavtigian et al.)</p>
+                </div>
+                <div class="no-print" style="display:flex; gap:8px;">
+                    <button onclick="window.print()" class="btn-report" style="padding:6px 12px; font-size:0.85rem;"><i class="fa-solid fa-print"></i> Imprimir / PDF</button>
+                    <button onclick="window.tortaApp.closeReportModal()" style="background:#e2e8f0; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-weight:700;">&times;</button>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:20px; background:#f8fafc; padding:16px; border-radius:10px; font-size:0.88rem;">
+                <div><strong>Gen:</strong> <span id="repGene">No especificado</span></div>
+                <div><strong>HGVS:</strong> <span id="repHGVS">No especificado</span></div>
+                <div><strong>Modelo Herencia:</strong> <span id="repInheritance">AD</span></div>
+                <div><strong>Fecha Evaluación:</strong> <span id="repDate">03/08/2026</span></div>
+                <div><strong>Consecuencia:</strong> <span id="repConsequence">MISSENSE</span></div>
+                <div><strong>Puntuación Total:</strong> <span id="repPoints" style="font-weight:800;">0 pts</span></div>
+            </div>
+
+            <h3 style="font-size:1.1rem; border-bottom:1px solid #e2e8f0; padding-bottom:6px; margin-bottom:12px">Criterios Seleccionados y Gradaciones</h3>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Criterio / Descripción</th>
+                        <th>Gradación</th>
+                        <th>Puntos</th>
+                    </tr>
+                </thead>
+                <tbody id="repTableBody"></tbody>
+            </table>
+
+            <div style="margin-top:24px; text-align:center; padding:20px; background:#f1f5f9; border-radius:12px;">
+                <span style="font-size:0.85rem; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:6px">Veredicto Final Obtenido</span>
+                <div id="repVerdictBadge" class="report-verdict-badge badge-vus">VARIANTE DE SIGNIFICADO INCIERTO (VUS)</div>
+                <div style="margin-top:8px; font-size:0.9rem; color:#475569">Probabilidad Posterior estimada: <strong id="repProb">0.10</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE APLICACIÓN -->
+    <script src="torta_app.js"></script>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL WIZARD PP1 / PP4 / BS4 — ClinGen Co-segregación 2024
+══════════════════════════════════════════════════════════════ -->
+<style>
+/* Modal Overlay */
+#pp1Modal {
+    display:none; position:fixed; inset:0; z-index:9000;
+    background:rgba(0,0,0,0.78); backdrop-filter:blur(5px);
+    align-items:center; justify-content:center; overflow-y:auto; padding:20px 16px;
+}
+#pp1Modal.open { display:flex; }
+.pp1-modal-box {
+    background:linear-gradient(135deg,#0f172a 0%,#1a1f35 100%);
+    border:1px solid rgba(245,158,11,0.4); border-radius:20px;
+    width:100%; max-width:920px; max-height:90vh; display:flex; flex-direction:column;
+    box-shadow:0 24px 80px rgba(0,0,0,0.8); overflow:hidden;
+    animation: pp1SlideIn 0.25s ease;
+}
+@keyframes pp1SlideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+
+.pp1-modal-header {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 24px; border-bottom:1px solid rgba(245,158,11,0.2); background:rgba(15,23,42,0.6);
+}
+.pp1-modal-title { font-size:1.05rem; font-weight:800; color:var(--neon-amber); display:flex; align-items:center; gap:10px; }
+.pp1-close-btn { background:none;border:none;color:#64748b;font-size:1.4rem;cursor:pointer;line-height:1; }
+.pp1-close-btn:hover { color:#f87171; }
+
+/* Grid Body */
+.pp1-modal-body-grid {
+    display:grid; grid-template-columns: 1fr 310px; flex:1; overflow:hidden; min-height:0;
+}
+@media (max-width: 768px) {
+    .pp1-modal-body-grid { grid-template-columns: 1fr; overflow-y:auto; }
+}
+
+/* Form Column */
+.pp1-form-col {
+    padding:20px 24px; overflow-y:auto; display:flex; flex-direction:column; justify-content:space-between;
+}
+
+/* Steps nav */
+.pp1-steps-nav {
+    display:flex; align-items:center; padding-bottom:16px; border-bottom:1px solid rgba(245,158,11,0.12); margin-bottom:16px;
+}
+.pp1-step-dot { display:flex; flex-direction:column; align-items:center; flex:1; cursor:pointer; }
+.pp1-step-dot-circle {
+    width:26px; height:26px; border-radius:50%; border:2px solid rgba(245,158,11,0.3);
+    display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:700;
+    color:#64748b; transition:all 0.2s;
+}
+.pp1-step-dot.active .pp1-step-dot-circle { border-color:var(--neon-amber); background:rgba(245,158,11,0.18); color:var(--neon-amber); }
+.pp1-step-dot.done   .pp1-step-dot-circle { border-color:#22c55e; background:rgba(34,197,94,0.15); color:#22c55e; }
+.pp1-step-dot-label  { font-size:0.6rem; color:#64748b; margin-top:4px; text-align:center; }
+.pp1-step-dot.active .pp1-step-dot-label { color:var(--neon-amber); font-weight:700; }
+.pp1-step-connector { height:2px; flex:1; background:rgba(245,158,11,0.15); margin:0 4px 14px; }
+
+/* Panels */
+.pp1-step-panel { display:none; }
+.pp1-step-panel.visible { display:block; animation: pp1FadeIn 0.2s ease; }
+@keyframes pp1FadeIn { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:translateX(0)} }
+
+.pp1-step-title { font-size:0.9rem; font-weight:700; color:var(--neon-amber); margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; }
+.pp1-radio-group { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+.pp1-radio-label {
+    display:flex; align-items:center; gap:6px; cursor:pointer;
+    background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:8px;
+    padding:8px 12px; font-size:0.8rem; color:var(--text-secondary); transition:all 0.15s;
+}
+.pp1-radio-label:has(input:checked) { background:rgba(245,158,11,0.16); border-color:var(--neon-amber); color:var(--neon-amber); font-weight:600; }
+.pp1-input {
+    width:100%; background:rgba(15,23,42,0.7); border:1px solid rgba(245,158,11,0.3);
+    border-radius:8px; padding:8px 12px; color:var(--text-primary); font-size:0.88rem; box-sizing:border-box;
+}
+.pp1-input:focus { outline:none; border-color:var(--neon-amber); }
+.pp1-note { background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:8px; padding:10px 12px; font-size:0.75rem; color:var(--text-secondary); margin-top:10px; line-height:1.5; }
+
+.pp1-info-btn {
+    background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:var(--neon-amber);
+    width:22px; height:22px; border-radius:50%; font-size:0.75rem; font-weight:800; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; line-height:1; transition:all 0.15s;
+}
+.pp1-info-btn:hover { background:rgba(245,158,11,0.3); transform:scale(1.1); }
+
+/* Sidebar Results Column */
+.pp1-sidebar-col {
+    background:rgba(15,23,42,0.85); border-left:1px solid rgba(245,158,11,0.2);
+    padding:20px; display:flex; flex-direction:column; justify-content:space-between; overflow-y:auto;
+}
+.pp1-res-title { font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px; }
+.pp1-res-score-box {
+    background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:12px;
+    padding:14px; text-align:center; margin-bottom:12px;
+}
+.pp1-res-score-val { font-size:2.2rem; font-weight:900; color:var(--neon-cyan); line-height:1; }
+.pp1-res-score-lbl { font-size:0.68rem; color:#64748b; margin-top:4px; text-transform:uppercase; }
+.pp1-res-cap { font-size:0.65rem; font-weight:800; color:#f59e0b; background:rgba(245,158,11,0.2); padding:3px 8px; border-radius:10px; display:inline-block; margin-top:6px; }
+
+.pp1-res-acmg-box {
+    background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.3); border-radius:10px;
+    padding:10px 12px; margin-bottom:12px; text-align:center;
+}
+.pp1-res-acmg-code { font-size:0.85rem; font-weight:800; color:#4ade80; }
+
+.pp1-breakdown-list { margin-bottom:14px; border-top:1px dashed rgba(255,255,255,0.1); padding-top:10px; }
+.pp1-breakdown-item { display:flex; justify-content:space-between; font-size:0.78rem; color:#94a3b8; margin-bottom:6px; }
+.pp1-breakdown-item span:last-child { font-weight:700; color:#f8fafc; }
+
+/* Sub-modals for Reference Tables */
+.pp1-submodal-overlay {
+    display:none; position:fixed; inset:0; z-index:9500;
+    background:rgba(0,0,0,0.8); backdrop-filter:blur(4px);
+    align-items:center; justify-content:center; padding:16px;
+}
+.pp1-submodal-overlay.active { display:flex; }
+.pp1-submodal-card {
+    background:#0f172a; border:1px solid rgba(245,158,11,0.4); border-radius:14px;
+    width:100%; max-width:540px; max-height:80vh; overflow-y:auto; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,0.9);
+}
+.pp1-submodal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.pp1-submodal-title { font-size:0.92rem; font-weight:800; color:var(--neon-amber); }
+.pp1-table { width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left; }
+.pp1-table th, .pp1-table td { padding:7px 10px; border-bottom:1px solid rgba(255,255,255,0.08); }
+.pp1-table th { background:rgba(245,158,11,0.15); color:var(--neon-amber); font-weight:700; }
+.pp1-table td { color:var(--text-secondary); }
+</style>
+
+<div id="pp1Modal">
+  <div class="pp1-modal-box">
+
+    <!-- Header -->
+    <div class="pp1-modal-header">
+      <div class="pp1-modal-title">
+        <i class="fa-solid fa-users-rectangle"></i>
+        Calculadora Co-segregación & Locus ClinGen 2024
+      </div>
+      <button class="pp1-close-btn" onclick="window.tortaApp.closePP1Modal()">✕</button>
+    </div>
+
+    <div class="pp1-modal-body-grid">
+
+      <!-- Left Column: Form Steps -->
+      <div class="pp1-form-col">
+        <div>
+          <!-- Steps Nav -->
+          <div class="pp1-steps-nav">
+            <div class="pp1-step-dot active" id="pp1Nav0" onclick="window.tortaApp.pp1GoStep(0)">
+              <div class="pp1-step-dot-circle">0</div>
+              <div class="pp1-step-dot-label">Caso</div>
+            </div>
+            <div class="pp1-step-connector"></div>
+            <div class="pp1-step-dot" id="pp1Nav1" onclick="window.tortaApp.pp1GoStep(1)">
+              <div class="pp1-step-dot-circle">1</div>
+              <div class="pp1-step-dot-label">PP4</div>
+            </div>
+            <div class="pp1-step-connector"></div>
+            <div class="pp1-step-dot" id="pp1Nav2" onclick="window.tortaApp.pp1GoStep(2)">
+              <div class="pp1-step-dot-circle">2</div>
+              <div class="pp1-step-dot-label">PP1/BS4</div>
+            </div>
+            <div class="pp1-step-connector"></div>
+            <div class="pp1-step-dot" id="pp1Nav3" onclick="window.tortaApp.pp1GoStep(3)">
+              <div class="pp1-step-dot-circle">3</div>
+              <div class="pp1-step-dot-label">Exclusión/Cis</div>
+            </div>
+          </div>
+
+          <!-- Panel 0: Datos del Caso -->
+          <div class="pp1-step-panel visible" id="pp1Panel0">
+            <div class="pp1-step-title">
+              <span><i class="fa-solid fa-circle-info"></i> Paso 0: Datos del Caso y Herencia</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+              <div>
+                <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:4px;">Herencia (Sincronizada Paso 0)</label>
+                <div id="pp1ModalInheritance" style="font-size:0.88rem;font-weight:700;color:var(--neon-amber);background:rgba(245,158,11,0.1);padding:8px 12px;border-radius:8px;">Autosómico Dominante (AD)</div>
+              </div>
+              <div>
+                <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:4px;">¿Penetranza completa en familia?</label>
+                <div class="pp1-radio-group" style="margin-bottom:0;">
+                  <label class="pp1-radio-label"><input type="radio" name="pp1MPen" value="yes" checked onchange="window.tortaApp.calcPP1()"> Sí</label>
+                  <label class="pp1-radio-label"><input type="radio" name="pp1MPen" value="no" onchange="window.tortaApp.calcPP1()"> No (Solo Afectados)</label>
+                </div>
+              </div>
+            </div>
+            <div class="pp1-note">
+              <strong>Regla ClinGen 2024:</strong> El caso índice (proband) y los padres no se cuentan para co-segregación.<br>
+              En penetranza reducida, se evalúa únicamente en miembros enfermos y PP4 exige rendimiento del gen &gt; 20%.
+            </div>
+          </div>
+
+          <!-- Panel 1: Especificidad Fenotípica (PP4) -->
+          <div class="pp1-step-panel" id="pp1Panel1">
+            <div class="pp1-step-title">
+              <span><i class="fa-solid fa-dna"></i> Paso 1: Especificidad Fenotípica (PP4)</span>
+              <button class="pp1-info-btn" onclick="window.tortaApp.openPP1Submodal('pp1SubmodalT2')" title="Ver Tabla 2 PP4">?</button>
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:6px;">Homogeneidad de Locus</label>
+              <div class="pp1-radio-group">
+                <label class="pp1-radio-label"><input type="radio" name="pp1MLocus" value="no" checked onchange="window.tortaApp.calcPP1()"> Heterogéneo (gen no único)</label>
+                <label class="pp1-radio-label"><input type="radio" name="pp1MLocus" value="yes" onchange="window.tortaApp.calcPP1()"> Homogéneo (ej. Cistinosis/CTNS)</label>
+              </div>
+            </div>
+            <div id="pp1MYieldSection">
+              <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:4px;">Rendimiento diagnóstico / Atribución (%)</label>
+              <input class="pp1-input" type="number" id="pp1MDiagYield" min="0" max="100" step="0.1" value="0" placeholder="Ej. 50.6" oninput="window.tortaApp.calcPP1()">
+              <div style="font-size:0.7rem;color:#64748b;margin-top:4px;">Mapeado según Tabla 2 (ej. 25.4% = +1.5p; 50.6% = +3.0p; 95% = +7.0p)</div>
+            </div>
+            <div id="pp1MHomoNote" class="pp1-note" style="display:none;border-color:rgba(245,158,11,0.4);color:var(--neon-amber);">
+              <strong>Locus Homogéneo:</strong> PP4 basal = +7.0 pts. No se debe calcular PP1 para evitar doble conteo.
+            </div>
+          </div>
+
+          <!-- Panel 2: Co-segregación (PP1 / BS4) -->
+          <div class="pp1-step-panel" id="pp1Panel2">
+            <div class="pp1-step-title">
+              <span><i class="fa-solid fa-people-group"></i> Paso 2: Co-segregación Familiar (PP1 / BS4)</span>
+              <button class="pp1-info-btn" onclick="window.tortaApp.openPP1Submodal('pp1SubmodalT3')" title="Ver Tabla 3 PP1">?</button>
+            </div>
+
+            <!-- Tabla Guía Inline ClinGen 2024 -->
+            <div style="background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.25); border-radius:10px; padding:10px 12px; margin-bottom:12px;">
+              <div style="font-size:0.73rem; font-weight:700; color:var(--neon-amber); margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                <i class="fa-solid fa-table-list"></i> Guía ClinGen 2024 — Puntos por Meiosis
+              </div>
+              <table style="width:100%; border-collapse:collapse; font-size:0.72rem; color:var(--text-secondary);">
+                <thead>
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+                    <th style="padding:3px 4px; color:#64748b;">Herencia / Categoría</th>
+                    <th style="padding:3px 4px; color:var(--neon-amber);">Puntos / Individuo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td style="padding:3px 4px;">Recesivo (AR): Hermano Afectado</td><td style="padding:3px 4px; font-weight:700; color:var(--neon-amber);">+2.0 pts / ind</td></tr>
+                  <tr><td style="padding:3px 4px;">Recesivo (AR): Hermano Sano / Portador</td><td style="padding:3px 4px; font-weight:700; color:var(--neon-amber);">+0.4 pts / ind</td></tr>
+                  <tr><td style="padding:3px 4px;">Dominante (AD) / XL: Familiar Afectado</td><td style="padding:3px 4px; font-weight:700; color:var(--neon-amber);">+1.0 pt / ind</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p style="font-size:0.75rem;color:#64748b;margin-bottom:10px;">Individuos informativos adicionales (sin incluir proband ni padres):</p>
+
+            <!-- AR -->
+            <div id="pp1MArSection" style="display:none;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                  <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:4px;">Hermanos Afectados (+2.0p/ind)</label>
+                  <input class="pp1-input" type="number" id="pp1MArAff" min="0" value="0" oninput="window.tortaApp.calcPP1()">
+                </div>
+                <div>
+                  <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:4px;">Hermanos Sanos (+0.4p/ind)</label>
+                  <input class="pp1-input" type="number" id="pp1MArUnaff" min="0" value="0" oninput="window.tortaApp.calcPP1()">
+                </div>
+              </div>
+            </div>
+
+            <!-- AD/XL -->
+            <div id="pp1MAdXlSection">
+              <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:4px;">Familiares informativos que co-segregan (+1.0p/ind)</label>
+              <input class="pp1-input" type="number" id="pp1MAdXlCnt" min="0" value="0" oninput="window.tortaApp.calcPP1()">
+            </div>
+
+            <label style="font-size:0.8rem;display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-top:12px;background:rgba(248,113,113,0.05);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:8px 10px;">
+              <input type="checkbox" id="pp1MNonSeg" onchange="window.tortaApp.calcPP1()" style="margin-top:2px;">
+              <span>¿No-segregación clara? → Castigo de <strong style="color:#f87171;">−4.0 pts (BS4 Benigno)</strong></span>
+            </label>
+          </div>
+
+          <!-- Panel 3: Exclusión de Loci y Cis -->
+          <div class="pp1-step-panel" id="pp1Panel3">
+            <div class="pp1-step-title">
+              <span><i class="fa-solid fa-code-branch"></i> Paso 3: Exclusión de Loci & Variantes en Cis</span>
+            </div>
+
+            <label style="font-size:0.8rem;display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:10px;">
+              <input type="checkbox" id="pp1MLocusExcl" onchange="window.tortaApp.calcPP1()" style="margin-top:2px;">
+              <span>¿Se descartó otro locus candidato por negatividad?</span>
+            </label>
+
+            <div id="pp1MExclYieldGroup" style="display:none;margin-top:6px;margin-bottom:12px;">
+              <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:4px;">Rendimiento recalculado tras exclusión (%)</label>
+              <input class="pp1-input" type="number" id="pp1MAdjYield" min="0" max="100" step="0.1" value="0" placeholder="Ej. 99" oninput="window.tortaApp.calcPP1()">
+            </div>
+
+            <div style="margin-top:12px;border-top:1px dashed rgba(255,255,255,0.1);padding-top:10px;">
+              <label style="font-size:0.75rem;color:#64748b;display:block;margin-bottom:4px;">N° de variantes candidatas en Cis en el mismo alelo</label>
+              <input class="pp1-input" type="number" id="pp1MCisVariants" min="1" value="1" oninput="window.tortaApp.calcPP1()">
+              <div style="font-size:0.68rem;color:#64748b;margin-top:4px;">Si hay N variantes en cis, la puntuación bruta se divide entre N.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wizard Nav Buttons -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; border-top:1px solid rgba(245,158,11,0.15); padding-top:14px;">
+          <button class="pp1-btn pp1-btn-outline" id="pp1BtnBack" onclick="window.tortaApp.pp1PrevStep()" style="display:none;">← Anterior</button>
+          <div style="flex:1;"></div>
+          <button class="pp1-btn pp1-btn-primary" id="pp1BtnNext" onclick="window.tortaApp.pp1NextStep()">Siguiente →</button>
+        </div>
+      </div><!-- /.pp1-form-col -->
+
+      <!-- Right Column: Sidebar Live Results -->
+      <div class="pp1-sidebar-col">
+        <div>
+          <div class="pp1-res-title"><i class="fa-solid fa-calculator"></i> Puntuación ClinGen 2024</div>
+
+          <div class="pp1-res-score-box">
+            <div class="pp1-res-score-val" id="pp1MTotalVal">0.0</div>
+            <div class="pp1-res-score-lbl">Puntos Acumulados Locus</div>
+            <div class="pp1-res-cap" id="pp1MCapNotice" style="display:none;">TOPE ALCANZADO (MAX +5.0)</div>
+          </div>
+
+          <div class="pp1-res-acmg-box">
+            <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;margin-bottom:2px;">Equivalencia ACMG/AMP</div>
+            <div class="pp1-res-acmg-code" id="pp1MAcmgCode">No aplicable</div>
+            <button class="pp1-info-btn" style="margin-top:6px;width:18px;height:18px;font-size:0.65rem;" onclick="window.tortaApp.openPP1Submodal('pp1SubmodalT4')" title="Ver Tabla 4 ACMG">?</button>
+          </div>
+
+          <div class="pp1-breakdown-list">
+            <div class="pp1-breakdown-item"><span>PP4 Fenotipo:</span><span id="pp1MPp4Val">+0.0 pt</span></div>
+            <div class="pp1-breakdown-item"><span>PP1 Co-segregación:</span><span id="pp1MPp1Val">+0.0 pt</span></div>
+            <div class="pp1-breakdown-item" id="pp1MCisRow" style="display:none;"><span>División Cis (1/N):</span><span id="pp1MCisVal">N/A</span></div>
+            <div class="pp1-breakdown-item" style="border-top:1px dashed rgba(255,255,255,0.08);padding-top:4px;"><span>Suma Bruta:</span><span id="pp1MRawVal">0.0 pt</span></div>
+          </div>
+
+          <div style="font-size:0.68rem;color:#f87171;background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:6px 8px;line-height:1.4;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Locus máx: +5.0 pts (no puede ser &ge; +6 por sí sola).
+          </div>
+        </div>
+
+        <button class="pp1-btn pp1-btn-success" onclick="window.tortaApp.applyPP1Result()" style="width:100%;margin-top:14px;padding:10px 14px;font-size:0.88rem;box-shadow:0 4px 14px rgba(34,197,94,0.3);">
+          ✓ Aplicar al Análisis ACMG
+        </button>
+      </div><!-- /.pp1-sidebar-col -->
+
+    </div><!-- /.pp1-modal-body-grid -->
+
+  </div>
+</div><!-- /#pp1Modal -->
+
+<!-- Submodal Tabla 2 -->
+<div class="pp1-submodal-overlay" id="pp1SubmodalT2">
+  <div class="pp1-submodal-card">
+    <div class="pp1-submodal-header">
+      <div class="pp1-submodal-title">Tabla 2: Conversión Rendimiento Diagnóstico (PP4) → Puntos</div>
+      <button class="pp1-close-btn" onclick="window.tortaApp.closePP1Submodal('pp1SubmodalT2')">✕</button>
+    </div>
+    <table class="pp1-table">
+      <thead><tr><th>Rendimiento Diagnóstico (%)</th><th>Puntos (PP4)</th></tr></thead>
+      <tbody>
+        <tr><td>99.9%</td><td>+12.0</td></tr>
+        <tr><td>99.4%</td><td>+10.0</td></tr>
+        <tr><td>95.0%</td><td>+7.0</td></tr>
+        <tr><td>90.2%</td><td>+6.0</td></tr>
+        <tr><td>75.4%</td><td>+4.5</td></tr>
+        <tr><td>50.6%</td><td>+3.0</td></tr>
+        <tr><td>25.4%</td><td>+1.5</td></tr>
+        <tr><td>19.1%</td><td>+1.0</td></tr>
+        <tr><td>&lt; 19.1%</td><td>0.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Submodal Tabla 3 -->
+<div class="pp1-submodal-overlay" id="pp1SubmodalT3">
+  <div class="pp1-submodal-card">
+    <div class="pp1-submodal-header">
+      <div class="pp1-submodal-title">Tabla 3: Puntos Co-segregación (PP1/BS4) por Individuo</div>
+      <button class="pp1-close-btn" onclick="window.tortaApp.closePP1Submodal('pp1SubmodalT3')">✕</button>
+    </div>
+    <table class="pp1-table">
+      <thead><tr><th>Categoría / Herencia</th><th>1 ind.</th><th>2 ind.</th><th>3 ind.</th><th>4 ind.</th></tr></thead>
+      <tbody>
+        <tr><td>Recesivo: Afectado (+2.0p/ind)</td><td>+2.0</td><td>+4.0</td><td>+6.0</td><td>+8.0</td></tr>
+        <tr><td>Recesivo: Sano (+0.4p/ind)</td><td>+0.4</td><td>+0.8</td><td>+1.2</td><td>+1.6</td></tr>
+        <tr><td>Dominante / XL (+1.0p/ind)</td><td>+1.0</td><td>+2.0</td><td>+3.0</td><td>+4.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Submodal Tabla 4 -->
+<div class="pp1-submodal-overlay" id="pp1SubmodalT4">
+  <div class="pp1-submodal-card">
+    <div class="pp1-submodal-header">
+      <div class="pp1-submodal-title">Tabla 4: Conversión de Puntos → Código ACMG</div>
+      <button class="pp1-close-btn" onclick="window.tortaApp.closePP1Submodal('pp1SubmodalT4')">✕</button>
+    </div>
+    <table class="pp1-table">
+      <thead><tr><th>Puntos Locus</th><th>Código ACMG Sugerido</th></tr></thead>
+      <tbody>
+        <tr><td>0.0 - 0.9</td><td>No aplicable</td></tr>
+        <tr><td>1.0 - 1.9</td><td>PP1_Supporting ó PP4_Supporting</td></tr>
+        <tr><td>2.0 - 2.9</td><td>PP1_Moderate ó PP4_Moderate ó [PP1_Supp+PP4_Supp]</td></tr>
+        <tr><td>3.0 - 3.9</td><td>[PP1_Supp+PP4_Mod] ó [PP4_Supp+PP1_Mod]</td></tr>
+        <tr><td>4.0 - 4.9</td><td>PP1_Strong ó PP4_Strong ó [PP1_Mod+PP4_Mod]</td></tr>
+        <tr><td>5.0+ (CAP)</td><td>PP1_Strong + PP4_Supporting (TOPE DE LOCUS)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="torta_app.js"></script>
+</body>
+</html>

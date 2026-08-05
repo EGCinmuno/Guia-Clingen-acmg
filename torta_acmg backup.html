@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torta ACMG — Visualizador Interactivos & Calculadora Bayesiana</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="torta_style.css">
+</head>
+
+<body>
+    <div class="torta-container">
+        <!-- HEADER -->
+        <header class="torta-header">
+            <div class="brand-title">
+                <i class="fa-solid fa-chart-pie"></i>
+                <div>
+                    <h1>Torta ACMG & Framework Bayesiano</h1>
+                    <p class="brand-subtitle">Rueda interactiva de evidencia, estratificación ClinGen y gradación REVEL</p>
+                </div>
+            </div>
+            <div class="header-badges">
+                <span class="pill-badge cyan"><i class="fa-solid fa-flask"></i> Modulo Testeo V2</span>
+                <span class="pill-badge purple"><i class="fa-solid fa-scale-balanced"></i> Marco Tavtigian</span>
+            </div>
+        </header>
+
+        <!-- DASHBOARD MAIN GRID -->
+        <div class="dashboard-grid">
+            <!-- LEFT PANEL: RUEDA INTERACTIVA SVG & FICHA TÉCNICA -->
+            <section class="glass-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-circle-nodes"></i> Rueda de Evidencia "Torta ACMG"</h2>
+                    <button class="btn-reset" id="resetBtn"><i class="fa-solid fa-rotate-left"></i> Reiniciar</button>
+                </div>
+
+                <!-- SVG WHEEL -->
+                <div class="wheel-wrapper">
+                    <div class="svg-container">
+                        <svg id="acmgWheelSvg"></svg>
+                    </div>
+                    <div class="wheel-legend" id="wheelLegend">
+                        <!-- Generada dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- DETALLE DEL CRITERIO SELECCIONADO / HOVER CON ENLACE A PAPERS -->
+                <div class="criterion-info-card" id="criterionInfoCard">
+                    <div class="info-card-header">
+                        <span class="info-code" id="infoCode">Selecciona un criterio</span>
+                        <span class="info-category" id="infoCategory">TORTA ACMG</span>
+                    </div>
+                    <h3 class="info-title-full" id="infoTitleFull">Explora los criterios científicos</h3>
+                    <p class="info-desc" id="infoDesc">
+                        Haz clic o pasa el cursor sobre cualquier nodo o sector de la Torta ACMG para consultar la descripción clínica, fuerza de evidencia y abrir el PDF de referencia de la carpeta <code>papers/</code>.
+                    </p>
+                    <div class="info-papers-section">
+                        <div class="info-papers-title"><i class="fa-solid fa-file-pdf"></i> Literatura Científica Asociada:</div>
+                        <div class="info-papers" id="infoPapers">
+                            <!-- Enlaces dinámicos a PDFs -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: CALCULADORA REVEL, ESTRATIFICACIÓN Y VEREDICTO BAYESIANO -->
+            <section class="glass-panel">
+                <!-- TARJETA DEL VEREDICTO FINAL -->
+                <div class="verdict-card">
+                    <span class="verdict-title">Veredicto Final Bayesiano</span>
+                    <h2 class="verdict-result-text verdict-vus" id="verdictText">VARIANTE DE SIGNIFICADO INCIERTO (VUS)</h2>
+
+                    <div class="verdict-stats-row">
+                        <div class="stat-box">
+                            <span>Puntos Totales</span>
+                            <strong id="totalPoints">0</strong>
+                        </div>
+                        <div class="stat-box">
+                            <span>Prob. Posteriori</span>
+                            <strong id="posteriorProb">0.10</strong>
+                        </div>
+                        <div class="stat-box">
+                            <span>Escala VUS</span>
+                            <strong id="vusScale">Baja (0 pts)</strong>
+                        </div>
+                    </div>
+
+                    <!-- CRITERIOS ACTIVOS EN LA SUMATORIA -->
+                    <div style="width:100%">
+                        <span style="font-size:0.78rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; display:block; margin-bottom:6px">Criterios Evaluados en el Veredicto:</span>
+                        <div class="active-criteria-tags" id="activeTagsContainer">
+                            <span style="color:var(--text-muted); font-size:0.85rem">Ningún criterio seleccionado</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTROLES DE LA CALCULADORA -->
+                <div class="calculator-box">
+                    <!-- REVEL SCORE SLIDER CARD CON SWITCH ON/OFF -->
+                    <div class="revel-card" id="revelCard">
+                        <div class="revel-header">
+                            <div class="revel-title">
+                                <i class="fa-solid fa-dna" style="color:var(--neon-cyan)"></i>
+                                <span>Score REVEL (In Silico)</span>
+                            </div>
+                            <div class="toggle-wrapper">
+                                <label class="switch">
+                                    <input type="checkbox" id="revelToggle" checked>
+                                    <span class="slider-round"></span>
+                                </label>
+                                <span class="toggle-label">Incluir en Veredicto</span>
+                            </div>
+                        </div>
+
+                        <div class="revel-controls">
+                            <input type="range" id="revelSlider" class="revel-slider" min="0.000" max="1.000" step="0.001" value="0.500">
+                            <input type="number" id="revelInput" class="revel-num-input" min="0.000" max="1.000" step="0.001" value="0.500">
+                        </div>
+
+                        <div class="revel-result-bar">
+                            <span>Evaluación Computacional REVEL: <strong class="revel-badge" id="revelGrade">Indeterminado (0p)</strong></span>
+                            <span style="font-size:1.1rem; font-weight:800; color:var(--neon-cyan)" id="revelPoints">0 pts</span>
+                        </div>
+                    </div>
+
+                    <!-- SELECCIÓN Y ESTRATIFICACIÓN / GRADACIÓN DE CRITERIOS -->
+                    <div class="criteria-selector">
+                        <div class="selector-title">
+                            <span><i class="fa-solid fa-list-check"></i> Gradación & Selección de Criterios ACMG</span>
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500">Cambia la fuerza de cada evidencia</span>
+                        </div>
+                        <div class="criteria-list" id="criteriaList">
+                            <!-- Generado dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE APLICACIÓN -->
+    <script type="module" src="torta_app.js"></script>
+</body>
+
+</html>

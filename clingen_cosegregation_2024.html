@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Co-segregación y Fenotipo (ClinGen 2024)</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --input-bg: #0f172a;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-indigo: #818cf8;
+            --accent-emerald: #34d399;
+            --accent-amber: #fbbf24;
+            --accent-rose: #f43f5e;
+            --gradient-accent: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            --modal-bg: #1e293b;
+        }
+
+        body.light-theme {
+            --bg-main: #f1f5f9;
+            --card-bg: #ffffff;
+            --card-border: #cbd5e1;
+            --input-bg: #f8fafc;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --accent-blue: #0284c7;
+            --accent-indigo: #4f46e5;
+            --accent-emerald: #059669;
+            --accent-amber: #d97706;
+            --accent-rose: #e11d48;
+            --gradient-accent: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%);
+            --shadow-card: 0 10px 25px -5px rgba(148, 163, 184, 0.2);
+            --modal-bg: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.5;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Top Bar Controls (Theme & Language) */
+        .top-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .control-btn {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: var(--shadow-card);
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            transform: translateY(-1px);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 2rem;
+        }
+
+        @media (max-width: 992px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-lg);
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-card);
+            transition: border-color 0.2s ease, background-color 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: #475569;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .card-header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .step-number {
+            background: var(--gradient-accent);
+            color: #ffffff;
+            font-weight: 700;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .info-btn {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .info-btn:hover {
+            background: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background-color: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        }
+
+        .radio-group, .checkbox-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .radio-label, .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: var(--input-bg);
+            border: 1px solid var(--card-border);
+            padding: 0.6rem 1rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .radio-label:hover, .checkbox-label:hover {
+            border-color: #475569;
+        }
+
+        input[type="radio"]:checked + span,
+        input[type="checkbox"]:checked + span {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .note-box {
+            background-color: rgba(56, 189, 248, 0.08);
+            border-left: 3px solid var(--accent-blue);
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            margin-top: 0.5rem;
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+        }
+
+        .warning-box {
+            background-color: rgba(251, 191, 36, 0.1);
+            border-left: 3px solid var(--accent-amber);
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            margin-top: 0.75rem;
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: var(--modal-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 650px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 1.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            color: var(--text-primary);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .modal-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        table.ref-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        table.ref-table th, table.ref-table td {
+            border: 1px solid var(--card-border);
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+        }
+
+        table.ref-table th {
+            background-color: var(--input-bg);
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        table.ref-table tr:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Sidebar Results */
+        .sidebar {
+            position: sticky;
+            top: 2rem;
+            height: fit-content;
+        }
+
+        .result-card {
+            background: var(--card-bg);
+            border: 1px solid var(--accent-indigo);
+            border-radius: var(--radius-lg);
+            padding: 1.75rem;
+            box-shadow: var(--shadow-card);
+        }
+
+        .result-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .score-display {
+            text-align: center;
+            margin: 1.5rem 0;
+        }
+
+        .score-value {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+        }
+
+        .score-max {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .cap-tag {
+            display: inline-block;
+            background: rgba(244, 63, 94, 0.15);
+            color: var(--accent-rose);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            margin-top: 0.5rem;
+        }
+
+        .acmg-box {
+            background-color: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+
+        .acmg-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .acmg-code {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--accent-emerald);
+            margin-top: 0.25rem;
+        }
+
+        .breakdown-list {
+            margin-top: 1.5rem;
+            border-top: 1px solid var(--card-border);
+            padding-top: 1rem;
+        }
+
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .breakdown-item span:last-child {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .two-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .two-cols {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Top Bar Controls -->
+    <div class="top-bar">
+        <button class="control-btn" id="langBtn" onclick="toggleLanguage()">
+            <span>🌐</span> <span id="langLabel">English</span>
+        </button>
+        <button class="control-btn" id="themeBtn" onclick="toggleTheme()">
+            <span id="themeIcon">☀️</span> <span id="themeLabel">Modo Claro</span>
+        </button>
+    </div>
+
+    <header>
+        <span class="badge" data-i18n="badge">ClinGen 2024 Consenso Biesecker et al.</span>
+        <h1 data-i18n="title">Ficha de Co-segregación y Fenotipo</h1>
+        <p class="subtitle" data-i18n="subtitle">Calculadora interactiva para calibración cuantitativa del locus (PP4 / PP1 / BS4)</p>
+    </header>
+
+    <div class="grid-layout">
+        <!-- Main Form Column -->
+        <div class="main-content">
+
+            <!-- Metadata Case -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <div class="step-number">0</div>
+                        <div class="card-title" data-i18n="step0Title">Datos del Caso y Genética (Opcional)</div>
+                    </div>
+                </div>
+                <div class="two-cols">
+                    <div class="form-group">
+                        <label for="caseId" data-i18n="caseIdLabel">Identificador del Caso / Muestra</label>
+                        <input type="text" id="caseId" data-i18n-ph="caseIdPh" placeholder="Ej. PAC-2024-001 (Opcional)">
+                    </div>
+                    <div class="form-group">
+                        <label for="geneName" data-i18n="geneNameLabel">Gen en Evaluación</label>
+                        <input type="text" id="geneName" data-i18n-ph="geneNamePh" placeholder="Ej. CTNS, ERCC6 (Opcional)">
+                    </div>
+                </div>
+                <div class="two-cols">
+                    <div class="form-group">
+                        <label for="hgvsVar" data-i18n="hgvsLabel">Variante HGVS</label>
+                        <input type="text" id="hgvsVar" data-i18n-ph="hgvsPh" placeholder="Ej. c.100C>T (Opcional)">
+                    </div>
+                    <div class="form-group">
+                        <label for="inheritance" data-i18n="inheritanceLabel">Patrón de Herencia</label>
+                        <select id="inheritance">
+                            <option value="AD" data-i18n="inheritanceAD">Autosómico Dominante (AD)</option>
+                            <option value="AR" data-i18n="inheritanceAR">Autosómico Recesivo (AR)</option>
+                            <option value="XL" data-i18n="inheritanceXL">Ligado al X Recesivo (XL)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="penetranceLabel">¿Penetranza Completa en la Familia?</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="penetrance" value="yes" checked>
+                            <span data-i18n="penetranceYes">Sí (Penetranza Completa)</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="penetrance" value="no">
+                            <span data-i18n="penetranceNo">No (Aplicar Enfoque "Solo Afectados")</span>
+                        </label>
+                    </div>
+                    <div class="note-box" id="penetranceNote" style="display: none;" data-i18n="penetranceNote">
+                        <strong>Nota de Solo Afectados:</strong> En penetranza reducida o incompleta, la co-segregación se evalúa únicamente en miembros enfermos y PP4 solo se permite si el rendimiento del gen es > 20% (+1.0 pt).
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 1: Phenotype Specificity (PP4) -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <div class="step-number">1</div>
+                        <div class="card-title" data-i18n="step1Title">Paso 1: Especificidad Fenotípica (Criterio PP4)</div>
+                    </div>
+                    <button class="info-btn" onclick="openModal('modalTabla2')" title="Ver Tabla 2 de Referencia">?</button>
+                </div>
+
+                <div class="form-group">
+                    <label data-i18n="locusHomoLabel">Homogeneidad de Locus</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="locusHomogeneity" value="no" checked>
+                            <span data-i18n="locusHomoNo">No (Heterogeneidad de Locus / Gen no único)</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="locusHomogeneity" value="yes">
+                            <span data-i18n="locusHomoYes">Sí (Locus Homogéneo - Ej. Cistinosis / CTNS)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="heterogeneousSection">
+                    <div class="form-group">
+                        <label for="diagnosticYield" data-i18n="yieldLabel">Rendimiento Diagnóstico / Atribución del Gen (%)</label>
+                        <input type="number" id="diagnosticYield" min="0" max="100" step="0.1" value="0" data-i18n-ph="yieldPh" placeholder="Ingrese % de rendimiento (0 = sin evidencia)">
+                        <div class="note-box" data-i18n="yieldNote">
+                            Se mapea según la Tabla 2 (Ej. 0% = 0 pt; 25.4% = +1.5 pt; 50.6% = +3.0 pt; 75.4% = +4.5 pt; 95.0% = +7.0 pt).
+                        </div>
+                    </div>
+                </div>
+
+                <div id="homogeneousSection" style="display: none;">
+                    <div class="warning-box" data-i18n="homoWarning">
+                        <strong>Locus Homogéneo Seleccionado:</strong> El fenotipo es tan específico que determina el locus. Se asigna PP4 alto (+7.0 pts basales) y <strong>NO se debe calcular co-segregación (PP1)</strong> para evitar doble conteo.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Co-segregation (PP1 / BS4) -->
+            <div class="card" id="cosegCard">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <div class="step-number">2</div>
+                        <div class="card-title" data-i18n="step2Title">Paso 2: Co-segregación en Familia (PP1 / BS4)</div>
+                    </div>
+                    <button class="info-btn" onclick="openModal('modalTabla3')" title="Ver Tabla 3 de Co-segregación">?</button>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;" data-i18n="cosegSub">
+                    *No incluya al caso índice ni a los padres (usados para establecer fase). Ingrese cantidad de miembros informativos adicionales.
+                </p>
+
+                <!-- AR specific inputs -->
+                <div id="arInputs" style="display: none;">
+                    <div class="two-cols">
+                        <div class="form-group">
+                            <label for="arAffected" data-i18n="arAffectedLabel">Hermanos Afectados adicionales (+2.0 pt/ind)</label>
+                            <input type="number" id="arAffected" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="arUnaffected" data-i18n="arUnaffectedLabel">Hermanos Sanos / Portadores adicionales (+0.4 pt/ind)</label>
+                            <input type="number" id="arUnaffected" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AD / XL inputs -->
+                <div id="adXlInputs">
+                    <div class="form-group">
+                        <label for="adXlCount" data-i18n="adXlCountLabel">Familiares informativos adicionales que co-segregan (+1.0 pt/ind)</label>
+                        <input type="number" id="adXlCount" min="0" value="0">
+                    </div>
+                </div>
+
+                <!-- Non-segregation / Benign BS4 -->
+                <div class="form-group" style="margin-top: 1rem; border-top: 1px dashed var(--card-border); padding-top: 1rem;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="nonSegregation">
+                        <span data-i18n="nonSegLabel">¿Existe no-segregación clara? (Afectado sin variante o sano con variante penetrante)</span>
+                    </label>
+                    <div class="warning-box" id="nonSegNote" style="display: none;" data-i18n="nonSegNote">
+                        La no-segregación constituye evidencia en contra de patogenicidad y aplica un castigo de <strong>-4.0 puntos (Evidencia Benigna BS4)</strong>.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Exclusion & Cis Distribution -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <div class="step-number">3</div>
+                        <div class="card-title" data-i18n="step3Title">Paso 3: Exclusión de Loci y Variación en Cis</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="locusExclusion">
+                        <span data-i18n="exclusionLabel">¿Se descartó otro locus candidato por negatividad o no-segregación?</span>
+                    </label>
+                    <div class="note-box" id="exclusionNote" style="display: none;" data-i18n="exclusionNote">
+                        Ejemplo Sdr. Cockayne: Al descartar <i>ERCC8</i> (30%), la probabilidad de <i>ERCC6</i> (70%) sube a ~100%, elevando los puntos basales de PP4.
+                    </div>
+                </div>
+
+                <div class="form-group" id="exclusionYieldGroup" style="display: none;">
+                    <label for="adjustedYield" data-i18n="adjustedYieldLabel">Rendimiento Recalculado tras Exclusión (%)</label>
+                    <input type="number" id="adjustedYield" min="0" max="100" step="0.1" value="0" data-i18n-ph="adjustedYieldPh" placeholder="Ej. 99">
+                </div>
+
+                <div class="form-group" style="margin-top: 1rem; border-top: 1px dashed var(--card-border); padding-top: 1rem;">
+                    <label for="cisVariants" data-i18n="cisVariantsLabel">Número de variantes candidatas en Cis en el mismo alelo</label>
+                    <input type="number" id="cisVariants" min="1" value="1">
+                    <div class="note-box" data-i18n="cisNote">
+                        Si hay N variantes en cis en un alelo heterocigoto compuesto, la probabilidad posterior se divide equitativamente entre las N variantes.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Sidebar Summary / Results -->
+        <div class="sidebar">
+            <div class="result-card">
+                <div class="result-title" data-i18n="resultsTitle">Puntuación Final ClinGen</div>
+
+                <div class="score-display">
+                    <div class="score-value" id="finalScoreDisplay">0.0</div>
+                    <div class="score-max" data-i18n="scoreMaxLabel">Puntos Acumulados de Locus</div>
+                    <div class="cap-tag" id="capNotice" style="display: none;" data-i18n="capTag">TOPE ALCANZADO (CAP +5.0)</div>
+                </div>
+
+                <div class="acmg-box">
+                    <div class="acmg-label" data-i18n="acmgLabel">Equivalencia ACMG / AMP</div>
+                    <div class="acmg-code" id="acmgCodeDisplay">No aplicable</div>
+                    <button class="info-btn" style="margin: 0.5rem auto 0 auto;" onclick="openModal('modalTabla4')" title="Ver Tabla 4 ACMG">?</button>
+                </div>
+
+                <div class="breakdown-list">
+                    <div class="breakdown-item">
+                        <span data-i18n="pp4Row">Puntos Fenotipo (PP4):</span>
+                        <span id="pp4Breakdown">+0.0 pt</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span data-i18n="pp1Row">Puntos Co-segregación (PP1/BS4):</span>
+                        <span id="pp1Breakdown">+0.0 pt</span>
+                    </div>
+                    <div class="breakdown-item" id="cisDivideRow" style="display: none;">
+                        <span data-i18n="cisRow">División en Cis (1/N):</span>
+                        <span id="cisBreakdown">N/A</span>
+                    </div>
+                    <div class="breakdown-item" style="border-top: 1px dashed var(--card-border); padding-top: 0.5rem; margin-top: 0.5rem;">
+                        <span data-i18n="rawScoreRow">Suma Bruta sin Cap:</span>
+                        <span id="rawScoreBreakdown">0.0 pt</span>
+                    </div>
+                </div>
+
+                <div class="warning-box" style="margin-top: 1.25rem; font-size: 0.8rem;" data-i18n="ruleWarning">
+                    <strong>Regla ClinGen 2024:</strong> La evidencia del locus (PP4 + PP1) nunca puede clasificar por sí sola una variante como Patogénica (+10) o Prob. Patogénica (+6). Máximo permitido: +5.0 pts.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tabla 2 -->
+<div class="modal-overlay" id="modalTabla2">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title" data-i18n="t2Title">Tabla 2: Conversión de Rendimiento Diagnóstico (PP4) a Puntos</div>
+            <button class="close-btn" onclick="closeModal('modalTabla2')">&times;</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;" data-i18n="t2Sub">
+            Relación oficial de Biesecker et al. (2024) entre la especificidad fenotípica (rendimiento diagnóstico del gen) y los puntos bayesianos asignados.
+        </p>
+        <table class="ref-table">
+            <thead>
+                <tr>
+                    <th data-i18n="t2ThYield">Rendimiento Diagnóstico (%)</th>
+                    <th data-i18n="t2ThPts">Puntos Bayesianos (PP4)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>99.9%</td><td>+12.0</td></tr>
+                <tr><td>99.5% - 99.8%</td><td>+10.5 a +11.5</td></tr>
+                <tr><td>99.4%</td><td>+10.0</td></tr>
+                <tr><td>97.5% - 99.2%</td><td>+8.0 a +9.5</td></tr>
+                <tr><td>95.0%</td><td>+7.0</td></tr>
+                <tr><td>90.2%</td><td>+6.0</td></tr>
+                <tr><td>86.4%</td><td>+5.5</td></tr>
+                <tr><td>81.6%</td><td>+5.0</td></tr>
+                <tr><td>75.4%</td><td>+4.5</td></tr>
+                <tr><td>68.0%</td><td>+4.0</td></tr>
+                <tr><td>59.6%</td><td>+3.5</td></tr>
+                <tr><td>50.6%</td><td>+3.0</td></tr>
+                <tr><td>41.5%</td><td>+2.5</td></tr>
+                <tr><td>33.0%</td><td>+2.0</td></tr>
+                <tr><td>25.4%</td><td>+1.5</td></tr>
+                <tr><td>19.1%</td><td>+1.0</td></tr>
+                <tr><td>&lt; 19.1%</td><td>0.0</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Tabla 3 -->
+<div class="modal-overlay" id="modalTabla3">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title" data-i18n="t3Title">Tabla 3: Puntos de Co-segregación (PP1/BS4) por Individuo</div>
+            <button class="close-btn" onclick="closeModal('modalTabla3')">&times;</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;" data-i18n="t3Sub">
+            Nota: No se cuenta al caso índice ni a los padres. Solo se cuentan los individuos informativos adicionales.
+        </p>
+        <table class="ref-table">
+            <thead>
+                <tr>
+                    <th data-i18n="t3ThCat">Categoría / Herencia</th>
+                    <th>1 ind.</th>
+                    <th>2 ind.</th>
+                    <th>3 ind.</th>
+                    <th>4 ind.</th>
+                    <th>5+ ind.</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td data-i18n="t3Row1"><strong>Autosómico Recesivo: Afectado</strong> (+2.0 pt / meiosis)</td>
+                    <td>+2.0</td><td>+4.0</td><td>+6.0</td><td>+8.0</td><td>+10.0</td>
+                </tr>
+                <tr>
+                    <td data-i18n="t3Row2"><strong>Autosómico Recesivo: Sano</strong> (+0.4 pt / meiosis)</td>
+                    <td>+0.4</td><td>+0.8</td><td>+1.2</td><td>+1.6</td><td>+2.0*</td>
+                </tr>
+                <tr>
+                    <td data-i18n="t3Row3"><strong>Autosómico Dominante</strong> (+1.0 pt / meiosis)</td>
+                    <td>+1.0</td><td>+2.0</td><td>+3.0</td><td>+4.0</td><td>+5.0</td>
+                </tr>
+                <tr>
+                    <td data-i18n="t3Row4"><strong>Ligado al X Recesivo: Varón</strong> (+1.0 pt / meiosis)</td>
+                    <td>+1.0</td><td>+2.0</td><td>+3.0</td><td>+4.0</td><td>+5.0</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Tabla 4 -->
+<div class="modal-overlay" id="modalTabla4">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title" data-i18n="t4Title">Tabla 4: Conversión de Puntos a Códigos ACMG/AMP</div>
+            <button class="close-btn" onclick="closeModal('modalTabla4')">&times;</button>
+        </div>
+        <table class="ref-table">
+            <thead>
+                <tr>
+                    <th data-i18n="t4ThRange">Rango de Puntos</th>
+                    <th data-i18n="t4ThStrength">Fuerza Mapeada ACMG/AMP Sugerida</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>0.0 - 0.9</td><td data-i18n="t4Row1">No aplicable (Evidencia insuficiente)</td></tr>
+                <tr><td>1.0 - 1.9</td><td data-i18n="t4Row2">PP1_Supporting Ó PP4_Supporting</td></tr>
+                <tr><td>2.0 - 2.9</td><td data-i18n="t4Row3">PP1_Moderate Ó PP4_Moderate Ó [PP1_Supp + PP4_Supp]</td></tr>
+                <tr><td>3.0 - 3.9</td><td data-i18n="t4Row4">[PP1_Supp + PP4_Mod] Ó [PP4_Supp + PP1_Mod]</td></tr>
+                <tr><td>4.0 - 4.9</td><td data-i18n="t4Row5">PP1_Strong Ó PP4_Strong Ó [PP1_Mod + PP4_Mod]</td></tr>
+                <tr><td>5.0 o más (CAP)</td><td data-i18n="t4Row6">PP1_Strong + PP4_Supporting / PP4_Strong + PP1_Supporting (Tope de Locus)</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // i18n Translations Dictionary
+    const translations = {
+        es: {
+            langBtn: "English",
+            themeDark: "Modo Oscuro",
+            themeLight: "Modo Claro",
+            badge: "ClinGen 2024 Consenso Biesecker et al.",
+            title: "Ficha de Co-segregación y Fenotipo",
+            subtitle: "Calculadora interactiva para calibración cuantitativa del locus (PP4 / PP1 / BS4)",
+            step0Title: "Datos del Caso y Genética (Opcional)",
+            caseIdLabel: "Identificador del Caso / Muestra",
+            caseIdPh: "Ej. PAC-2024-001 (Opcional)",
+            geneNameLabel: "Gen en Evaluación",
+            geneNamePh: "Ej. CTNS, ERCC6 (Opcional)",
+            hgvsLabel: "Variante HGVS",
+            hgvsPh: "Ej. c.100C>T (Opcional)",
+            inheritanceLabel: "Patrón de Herencia",
+            inheritanceAD: "Autosómico Dominante (AD)",
+            inheritanceAR: "Autosómico Recesivo (AR)",
+            inheritanceXL: "Ligado al X Recesivo (XL)",
+            penetranceLabel: "¿Penetranza Completa en la Familia?",
+            penetranceYes: "Sí (Penetranza Completa)",
+            penetranceNo: "No (Aplicar Enfoque \"Solo Afectados\")",
+            penetranceNote: "<strong>Nota de Solo Afectados:</strong> En penetranza reducida o incompleta, la co-segregación se evalúa únicamente en miembros enfermos y PP4 solo se permite si el rendimiento del gen es > 20% (+1.0 pt).",
+            step1Title: "Paso 1: Especificidad Fenotípica (Criterio PP4)",
+            locusHomoLabel: "Homogeneidad de Locus",
+            locusHomoNo: "No (Heterogeneidad de Locus / Gen no único)",
+            locusHomoYes: "Sí (Locus Homogéneo - Ej. Cistinosis / CTNS)",
+            yieldLabel: "Rendimiento Diagnóstico / Atribución del Gen (%)",
+            yieldPh: "Ingrese % de rendimiento (0 = sin evidencia)",
+            yieldNote: "Se mapea según la Tabla 2 (Ej. 0% = 0 pt; 25.4% = +1.5 pt; 50.6% = +3.0 pt; 75.4% = +4.5 pt; 95.0% = +7.0 pt).",
+            homoWarning: "<strong>Locus Homogéneo Seleccionado:</strong> El fenotipo es tan específico que determina el locus. Se asigna PP4 alto (+7.0 pts basales) y <strong>NO se debe calcular co-segregación (PP1)</strong> para evitar doble conteo.",
+            step2Title: "Paso 2: Co-segregación en Familia (PP1 / BS4)",
+            cosegSub: "*No incluya al caso índice ni a los padres (usados para establecer fase). Ingrese cantidad de miembros informativos adicionales.",
+            arAffectedLabel: "Hermanos Afectados adicionales (+2.0 pt/ind)",
+            arUnaffectedLabel: "Hermanos Sanos / Portadores adicionales (+0.4 pt/ind)",
+            adXlCountLabel: "Familiares informativos adicionales que co-segregan (+1.0 pt/ind)",
+            nonSegLabel: "¿Existe no-segregación clara? (Afectado sin variante o sano con variante penetrante)",
+            nonSegNote: "La no-segregación constituye evidencia en contra de patogenicidad y aplica un castigo de <strong>-4.0 puntos (Evidencia Benigna BS4)</strong>.",
+            step3Title: "Paso 3: Exclusión de Loci y Variación en Cis",
+            exclusionLabel: "¿Se descartó otro locus candidato por negatividad o no-segregación?",
+            exclusionNote: "Ejemplo Sdr. Cockayne: Al descartar <i>ERCC8</i> (30%), la probabilidad de <i>ERCC6</i> (70%) sube a ~100%, elevando los puntos basales de PP4.",
+            adjustedYieldLabel: "Rendimiento Recalculado tras Exclusión (%)",
+            adjustedYieldPh: "Ej. 99",
+            cisVariantsLabel: "Número de variantes candidatas en Cis en el mismo alelo",
+            cisNote: "Si hay N variantes en cis en un alelo heterocigoto compuesto, la probabilidad posterior se divide equitativamente entre las N variantes.",
+            resultsTitle: "Puntuación Final ClinGen",
+            scoreMaxLabel: "Puntos Acumulados de Locus",
+            capTag: "TOPE ALCANZADO (CAP +5.0)",
+            acmgLabel: "Equivalencia ACMG / AMP",
+            pp4Row: "Puntos Fenotipo (PP4):",
+            pp1Row: "Puntos Co-segregación (PP1/BS4):",
+            cisRow: "División en Cis (1/N):",
+            rawScoreRow: "Suma Bruta sin Cap:",
+            ruleWarning: "<strong>Regla ClinGen 2024:</strong> La evidencia del locus (PP4 + PP1) nunca puede clasificar por sí sola una variante como Patogénica (+10) o Prob. Patogénica (+6). Máximo permitido: +5.0 pts.",
+            t2Title: "Tabla 2: Conversión de Rendimiento Diagnóstico (PP4) a Puntos",
+            t2Sub: "Relación oficial de Biesecker et al. (2024) entre la especificidad fenotípica (rendimiento diagnóstico del gen) y los puntos bayesianos asignados.",
+            t2ThYield: "Rendimiento Diagnóstico (%)",
+            t2ThPts: "Puntos Bayesianos (PP4)",
+            t3Title: "Tabla 3: Puntos de Co-segregación (PP1/BS4) por Individuo",
+            t3Sub: "Nota: No se cuenta al caso índice ni a los padres. Solo se cuentan los individuos informativos adicionales.",
+            t3ThCat: "Categoría / Herencia",
+            t3Row1: "<strong>Autosómico Recesivo: Afectado</strong> (+2.0 pt / meiosis)",
+            t3Row2: "<strong>Autosómico Recesivo: Sano</strong> (+0.4 pt / meiosis)",
+            t3Row3: "<strong>Autosómico Dominante</strong> (+1.0 pt / meiosis)",
+            t3Row4: "<strong>Ligado al X Recesivo: Varón</strong> (+1.0 pt / meiosis)",
+            t4Title: "Tabla 4: Conversión de Puntos a Códigos ACMG/AMP",
+            t4ThRange: "Rango de Puntos",
+            t4ThStrength: "Fuerza Mapeada ACMG/AMP Sugerida",
+            t4Row1: "No aplicable (Evidencia insuficiente)",
+            t4Row2: "PP1_Supporting Ó PP4_Supporting",
+            t4Row3: "PP1_Moderate Ó PP4_Moderate Ó [PP1_Supp + PP4_Supp]",
+            t4Row4: "[PP1_Supp + PP4_Mod] Ó [PP4_Supp + PP1_Mod]",
+            t4Row5: "PP1_Strong Ó PP4_Strong Ó [PP1_Mod + PP4_Mod]",
+            t4Row6: "PP1_Strong + PP4_Supporting / PP4_Strong + PP1_Supporting (Tope de Locus)",
+            codeBS4: "BS4 (Evidencia Benigna de No-segregación)",
+            codeNA: "No aplicable (Insuficiente)",
+            codeSupp: "PP1_Supporting OR PP4_Supporting",
+            codeMod: "PP1_Moderate OR PP4_Moderate OR [PP1_Supp + PP4_Supp]",
+            codeMod2: "[PP1_Supp + PP4_Mod] OR [PP4_Supp + PP1_Mod]",
+            codeStrong: "PP1_Strong OR PP4_Strong OR [PP1_Mod + PP4_Mod]",
+            codeCap: "PP1_Strong + PP4_Supporting / PP4_Strong + PP1_Supporting (Tope de Locus)"
+        },
+        en: {
+            langBtn: "Español",
+            themeDark: "Dark Mode",
+            themeLight: "Light Mode",
+            badge: "ClinGen 2024 Consensus Biesecker et al.",
+            title: "Cosegregation and Phenotype Worksheet",
+            subtitle: "Interactive calculator for quantitative locus calibration (PP4 / PP1 / BS4)",
+            step0Title: "Case Data and Genetics (Optional)",
+            caseIdLabel: "Case / Sample ID",
+            caseIdPh: "e.g. PAC-2024-001 (Optional)",
+            geneNameLabel: "Gene Under Evaluation",
+            geneNamePh: "e.g. CTNS, ERCC6 (Optional)",
+            hgvsLabel: "HGVS Variant",
+            hgvsPh: "e.g. c.100C>T (Optional)",
+            inheritanceLabel: "Inheritance Pattern",
+            inheritanceAD: "Autosomal Dominant (AD)",
+            inheritanceAR: "Autosomal Recessive (AR)",
+            inheritanceXL: "X-Linked Recessive (XL)",
+            penetranceLabel: "Complete Penetrance in Family?",
+            penetranceYes: "Yes (Complete Penetrance)",
+            penetranceNo: "No (Apply 'Affected-Only' Approach)",
+            penetranceNote: "<strong>Affected-Only Note:</strong> Under incomplete penetrance, cosegregation is evaluated only in affected members and PP4 is allowed only if gene yield is > 20% (+1.0 pt).",
+            step1Title: "Step 1: Phenotypic Specificity (PP4 Criterion)",
+            locusHomoLabel: "Locus Homogeneity",
+            locusHomoNo: "No (Locus Heterogeneity / Non-unique gene)",
+            locusHomoYes: "Yes (Homogeneous Locus - e.g. Cystinosis / CTNS)",
+            yieldLabel: "Diagnostic Yield / Gene Attribution (%)",
+            yieldPh: "Enter % yield (0 = no evidence)",
+            yieldNote: "Mapped according to Table 2 (e.g., 0% = 0 pt; 25.4% = +1.5 pt; 50.6% = +3.0 pt; 75.4% = +4.5 pt; 95.0% = +7.0 pt).",
+            homoWarning: "<strong>Homogeneous Locus Selected:</strong> Phenotype is highly specific, pinning down the locus. High PP4 (+7.0 basal pts) is assigned and <strong>cosegregation (PP1) MUST NOT be counted</strong> to avoid double counting.",
+            step2Title: "Step 2: Family Cosegregation (PP1 / BS4)",
+            cosegSub: "*Do not count proband or parents (used to establish phase). Enter additional informative family members.",
+            arAffectedLabel: "Additional Affected Siblings (+2.0 pt/ind)",
+            arUnaffectedLabel: "Additional Unaffected / Carrier Siblings (+0.4 pt/ind)",
+            adXlCountLabel: "Additional informative cosegregating relatives (+1.0 pt/ind)",
+            nonSegLabel: "Is there clear non-segregation? (Affected without variant or healthy with penetrant variant)",
+            nonSegNote: "Non-segregation constitutes evidence against pathogenicity and applies a <strong>-4.0 points penalty (Benign BS4 Evidence)</strong>.",
+            step3Title: "Step 3: Locus Exclusion and Cis Variant Distribution",
+            exclusionLabel: "Was another candidate locus excluded by negative testing or non-segregation?",
+            exclusionNote: "Cockayne Sdr Example: Excluding <i>ERCC8</i> (30%) increases <i>ERCC6</i> (70%) probability to ~100%, raising basal PP4 points.",
+            adjustedYieldLabel: "Recalculated Yield Post-Exclusion (%)",
+            adjustedYieldPh: "e.g. 99",
+            cisVariantsLabel: "Number of candidate variants in Cis on the same allele",
+            cisNote: "If N candidate variants are in cis on a compound heterozygous allele, posterior probability is split equally among the N variants.",
+            resultsTitle: "ClinGen Final Score",
+            scoreMaxLabel: "Accumulated Locus Points",
+            capTag: "CAP REACHED (MAX +5.0)",
+            acmgLabel: "ACMG / AMP Equivalence",
+            pp4Row: "Phenotype Points (PP4):",
+            pp1Row: "Cosegregation Points (PP1/BS4):",
+            cisRow: "Cis Division (1/N):",
+            rawScoreRow: "Raw Sum Uncapped:",
+            ruleWarning: "<strong>ClinGen 2024 Rule:</strong> Locus evidence (PP4 + PP1) can NEVER classify a variant as Likely Pathogenic (+6) or Pathogenic (+10) by itself. Maximum allowed: +5.0 pts.",
+            t2Title: "Table 2: Diagnostic Yield (PP4) to Bayesian Points Conversion",
+            t2Sub: "Official Biesecker et al. (2024) relationship between phenotypic specificity (gene diagnostic yield) and assigned bayesian points.",
+            t2ThYield: "Diagnostic Yield (%)",
+            t2ThPts: "Bayesian Points (PP4)",
+            t3Title: "Table 3: Cosegregation Points (PP1/BS4) per Individual",
+            t3Sub: "Note: Proband and parents are excluded. Only additional informative individuals are counted.",
+            t3ThCat: "Category / Inheritance",
+            t3Row1: "<strong>Autosomal Recessive: Affected</strong> (+2.0 pt / meiosis)",
+            t3Row2: "<strong>Autosomal Recessive: Unaffected</strong> (+0.4 pt / meiosis)",
+            t3Row3: "<strong>Autosomal Dominant</strong> (+1.0 pt / meiosis)",
+            t3Row4: "<strong>X-Linked Recessive: Male</strong> (+1.0 pt / meiosis)",
+            t4Title: "Table 4: Points to ACMG/AMP Code Conversion",
+            t4ThRange: "Points Range",
+            t4ThStrength: "Suggested ACMG/AMP Mapped Strength",
+            t4Row1: "Not applicable (Insufficient evidence)",
+            t4Row2: "PP1_Supporting OR PP4_Supporting",
+            t4Row3: "PP1_Moderate OR PP4_Moderate OR [PP1_Supp + PP4_Supp]",
+            t4Row4: "[PP1_Supp + PP4_Mod] OR [PP4_Supp + PP1_Mod]",
+            t4Row5: "PP1_Strong OR PP4_Strong OR [PP1_Mod + PP4_Mod]",
+            t4Row6: "PP1_Strong + PP4_Supporting / PP4_Strong + PP1_Supporting (Locus Cap)",
+            codeBS4: "BS4 (Benign Non-segregation Evidence)",
+            codeNA: "Not applicable (Insufficient)",
+            codeSupp: "PP1_Supporting OR PP4_Supporting",
+            codeMod: "PP1_Moderate OR PP4_Moderate OR [PP1_Supp + PP4_Supp]",
+            codeMod2: "[PP1_Supp + PP4_Mod] OR [PP4_Supp + PP1_Mod]",
+            codeStrong: "PP1_Strong OR PP4_Strong OR [PP1_Mod + PP4_Mod]",
+            codeCap: "PP1_Strong + PP4_Supporting / PP4_Strong + PP1_Supporting (Locus Cap)"
+        }
+    };
+
+    let currentLang = 'es';
+    let isLight = false;
+
+    function toggleTheme() {
+        isLight = !isLight;
+        document.body.classList.toggle('light-theme', isLight);
+        document.getElementById('themeIcon').textContent = isLight ? '🌙' : '☀️';
+        document.getElementById('themeLabel').textContent = isLight 
+            ? translations[currentLang].themeDark 
+            : translations[currentLang].themeLight;
+    }
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'es' ? 'en' : 'es';
+        const t = translations[currentLang];
+        document.getElementById('langLabel').textContent = t.langBtn;
+        document.getElementById('themeLabel').textContent = isLight ? t.themeDark : t.themeLight;
+
+        // Translate text elements
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (t[key]) el.innerHTML = t[key];
+        });
+
+        // Translate placeholders
+        document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+            const key = el.getAttribute('data-i18n-ph');
+            if (t[key]) el.placeholder = t[key];
+        });
+
+        calculate();
+    }
+
+    // Table 2 mapping yield -> points
+    const yieldTable = [
+        { yield: 99.9, pts: 12.0 },
+        { yield: 99.8, pts: 11.5 },
+        { yield: 99.7, pts: 11.0 },
+        { yield: 99.6, pts: 10.5 },
+        { yield: 99.4, pts: 10.0 },
+        { yield: 99.2, pts: 9.5 },
+        { yield: 98.8, pts: 9.0 },
+        { yield: 98.3, pts: 8.5 },
+        { yield: 97.5, pts: 8.0 },
+        { yield: 96.5, pts: 7.5 },
+        { yield: 95.0, pts: 7.0 },
+        { yield: 90.2, pts: 6.0 },
+        { yield: 86.4, pts: 5.5 },
+        { yield: 81.6, pts: 5.0 },
+        { yield: 75.4, pts: 4.5 },
+        { yield: 68.0, pts: 4.0 },
+        { yield: 59.6, pts: 3.5 },
+        { yield: 50.6, pts: 3.0 },
+        { yield: 41.5, pts: 2.5 },
+        { yield: 33.0, pts: 2.0 },
+        { yield: 25.4, pts: 1.5 },
+        { yield: 19.1, pts: 1.0 }
+    ];
+
+    function getPointsFromYield(y) {
+        if (y < 19.1) return 0.0;
+        for (let entry of yieldTable) {
+            if (y >= entry.yield) return entry.pts;
+        }
+        return 1.0;
+    }
+
+    function getACMGCode(pts) {
+        const t = translations[currentLang];
+        if (pts <= -4.0) return t.codeBS4;
+        if (pts < 1.0) return t.codeNA;
+        if (pts < 2.0) return t.codeSupp;
+        if (pts < 3.0) return t.codeMod;
+        if (pts < 4.0) return t.codeMod2;
+        if (pts < 5.0) return t.codeStrong;
+        return t.codeCap;
+    }
+
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+    }
+
+    // Close modal on background click
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.remove('active');
+        });
+    });
+
+    function calculate() {
+        const inheritance = document.getElementById('inheritance').value;
+        const penetranceNo = document.querySelector('input[name="penetrance"][value="no"]').checked;
+        const isHomogeneous = document.querySelector('input[name="locusHomogeneity"][value="yes"]').checked;
+
+        // UI visibility toggles
+        document.getElementById('penetranceNote').style.display = penetranceNo ? 'block' : 'none';
+        document.getElementById('homogeneousSection').style.display = isHomogeneous ? 'block' : 'none';
+        document.getElementById('heterogeneousSection').style.display = isHomogeneous ? 'none' : 'block';
+        
+        document.getElementById('arInputs').style.display = (inheritance === 'AR' && !isHomogeneous) ? 'block' : 'none';
+        document.getElementById('adXlInputs').style.display = (inheritance !== 'AR' && !isHomogeneous) ? 'block' : 'none';
+        document.getElementById('cosegCard').style.opacity = isHomogeneous ? '0.5' : '1.0';
+
+        const nonSeg = document.getElementById('nonSegregation').checked;
+        document.getElementById('nonSegNote').style.display = nonSeg ? 'block' : 'none';
+
+        const locusExcl = document.getElementById('locusExclusion').checked;
+        document.getElementById('exclusionNote').style.display = locusExcl ? 'block' : 'none';
+        document.getElementById('exclusionYieldGroup').style.display = (locusExcl && !isHomogeneous) ? 'block' : 'none';
+
+        // 1. PP4 Calculation
+        let pp4Points = 0.0;
+        if (isHomogeneous) {
+            pp4Points = 7.0; // Basal high points for homogeneous locus
+        } else {
+            let effYield = parseFloat(document.getElementById('diagnosticYield').value) || 0;
+            if (locusExcl) {
+                effYield = parseFloat(document.getElementById('adjustedYield').value) || effYield;
+            }
+            
+            if (penetranceNo && effYield < 20.0) {
+                pp4Points = 0.0; // In reduced penetrance, PP4 requires yield > 20%
+            } else {
+                pp4Points = getPointsFromYield(effYield);
+            }
+        }
+
+        // 2. PP1 / BS4 Calculation
+        let pp1Points = 0.0;
+        if (!isHomogeneous) {
+            if (nonSeg) {
+                pp1Points = -4.0; // BS4 penalty
+            } else {
+                if (inheritance === 'AR') {
+                    const affected = parseInt(document.getElementById('arAffected').value) || 0;
+                    const unaffected = parseInt(document.getElementById('arUnaffected').value) || 0;
+                    pp1Points = (affected * 2.0) + (unaffected * 0.4);
+                } else {
+                    const count = parseInt(document.getElementById('adXlCount').value) || 0;
+                    pp1Points = count * 1.0;
+                }
+            }
+        }
+
+        // 3. Cis Division
+        const cisCount = Math.max(1, parseInt(document.getElementById('cisVariants').value) || 1);
+        let rawSum = pp4Points + pp1Points;
+        
+        if (cisCount > 1) {
+            document.getElementById('cisDivideRow').style.display = 'flex';
+            document.getElementById('cisBreakdown').textContent = `1 / ${cisCount}`;
+            rawSum = rawSum / cisCount;
+        } else {
+            document.getElementById('cisDivideRow').style.display = 'none';
+        }
+
+        // 4. Final Capped Score
+        let finalScore = rawSum;
+        let isCapped = false;
+        if (finalScore > 5.0) {
+            finalScore = 5.0;
+            isCapped = true;
+        }
+
+        // Update Sidebar UI
+        document.getElementById('pp4Breakdown').textContent = `+${pp4Points.toFixed(1)} pt`;
+        document.getElementById('pp1Breakdown').textContent = (pp1Points >= 0 ? `+${pp1Points.toFixed(1)}` : `${pp1Points.toFixed(1)}`) + ' pt';
+        document.getElementById('rawScoreBreakdown').textContent = `${rawSum.toFixed(1)} pt`;
+        document.getElementById('finalScoreDisplay').textContent = finalScore.toFixed(1);
+        document.getElementById('acmgCodeDisplay').textContent = getACMGCode(finalScore);
+        document.getElementById('capNotice').style.display = isCapped ? 'inline-block' : 'none';
+    }
+
+    // Attach Event Listeners
+    const inputs = document.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        input.addEventListener('input', calculate);
+        input.addEventListener('change', calculate);
+    });
+
+    // Initial calculation
+    calculate();
+</script>
+</body>
+</html>
