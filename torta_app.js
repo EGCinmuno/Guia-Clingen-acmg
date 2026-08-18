@@ -508,6 +508,380 @@ function calculateBayesianVerdict(totalPoints, hasBA1 = false) {
     return { verdict: 'VARIANTE DE SIGNIFICADO INCIERTO (VUS)', class: 'verdict-vus', prob: probFormatted };
 }
 
+class ACMGCanvasPlotter {
+    constructor(canvasId) {
+        this.canvasId = canvasId;
+        this.prior_p = 0.10;
+        this.odds_vst = 350.0;
+        this.pointsData = [];
+        this.theme = 'dark'; // 'dark' | 'light'
+        this.lastActiveTags = [];
+        this.lastHasBA1 = false;
+    }
+
+    getCanvas() {
+        return document.getElementById(this.canvasId);
+    }
+
+    setTheme(theme) {
+        this.theme = theme;
+        this.render(this.lastActiveTags, this.lastHasBA1);
+    }
+
+    calculatePostP(cumulativePoints, hasBA1 = false) {
+        if (hasBA1) return 0.0;
+        const exponent = cumulativePoints / 8.0;
+        const op = Math.pow(this.odds_vst, exponent);
+        const post_p = (op * this.prior_p) / ((op - 1) * this.prior_p + 1);
+        return Math.max(0, Math.min(1, parseFloat(post_p.toFixed(3))));
+    }
+
+    getColorForProb(p) {
+        const stops = [
+            { pos: 0.0, r: 22,  g: 163, b: 74  }, // green #16a34a
+            { pos: 0.1, r: 132, g: 204, b: 22  }, // yellow-green #84cc16
+            { pos: 0.5, r: 234, g: 179, b: 8   }, // gold #eab308
+            { pos: 0.8, r: 249, g: 115, b: 22  }, // darkorange #f97316
+            { pos: 0.9, r: 239, g: 68,  b: 68  }, // tomato #ef4444
+            { pos: 1.0, r: 220, g: 38,  b: 38  }  // red #dc2626
+        ];
+        if (p <= 0.0) return `rgb(${stops[0].r}, ${stops[0].g}, ${stops[0].b})`;
+        if (p >= 1.0) return `rgb(${stops[stops.length - 1].r}, ${stops[stops.length - 1].g}, ${stops[stops.length - 1].b})`;
+
+        for (let i = 0; i < stops.length - 1; i++) {
+            const s1 = stops[i];
+            const s2 = stops[i + 1];
+            if (p >= s1.pos && p <= s2.pos) {
+                const t = (p - s1.pos) / (s2.pos - s1.pos);
+                const r = Math.round(s1.r + t * (s2.r - s1.r));
+                const g = Math.round(s1.g + t * (s2.g - s1.g));
+                const b = Math.round(s1.b + t * (s2.b - s1.b));
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+        }
+        return '#eab308';
+    }
+
+    render(activeTags = [], hasBA1 = false, targetCanvas = null, themeOverride = null) {
+        this.lastActiveTags = activeTags;
+        this.lastHasBA1 = hasBA1;
+
+        const canvas = targetCanvas || this.getCanvas();
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const theme = themeOverride || this.theme || 'dark';
+        const isLight = theme === 'light';
+
+        // Construir secuencia de progresión de evidencia
+        const sequence = [
+            { xIndex: 0, label: 'Inicio', xLabel: 'Inicio (Prior)', post_p: this.prior_p, pts: 0 }
+        ];
+
+        let cumPts = 0;
+        let isBA1Active = false;
+        activeTags.forEach((tag, idx) => {
+            if (tag.code.includes('BA1')) isBA1Active = true;
+            cumPts += (tag.pts || 0);
+            const p = this.calculatePostP(cumPts, isBA1Active || hasBA1);
+            const shortCode = tag.code.length > 20 ? tag.code.substring(0, 18) + '...' : tag.code;
+            sequence.push({
+                xIndex: idx + 1,
+                label: shortCode,
+                xLabel: `+ ${shortCode}`,
+                post_p: p,
+                pts: tag.pts
+            });
+        });
+
+        this.pointsData = sequence;
+
+        // Dimensionado HiDPI
+        const dpr = window.devicePixelRatio || 1;
+        const parentW = canvas.parentElement ? canvas.parentElement.clientWidth : 860;
+        const displayWidth = Math.max(720, Math.min(1000, parentW - 24));
+        const displayHeight = 540;
+
+        canvas.width = displayWidth * dpr;
+        canvas.height = displayHeight * dpr;
+        canvas.style.width = `${displayWidth}px`;
+        canvas.style.height = `${displayHeight}px`;
+
+        ctx.save();
+        ctx.scale(dpr, dpr);
+
+        // Fondo del gráfico
+        ctx.fillStyle = isLight ? '#ffffff' : '#0b0f19';
+        ctx.fillRect(0, 0, displayWidth, displayHeight);
+
+        // Márgenes del área de trazado
+        const marginLeft = 65;
+        const marginRight = 85;
+        const marginTop = 45;
+        const marginBottom = 115;
+
+        const plotWidth = displayWidth - marginLeft - marginRight;
+        const plotHeight = displayHeight - marginTop - marginBottom;
+
+        // Conversión de coordenadas
+        const yMin = -0.05;
+        const yMax = 1.05;
+        const getY = (val) => marginTop + plotHeight - ((val - yMin) / (yMax - yMin)) * plotHeight;
+
+        const count = sequence.length;
+        const xMin = -0.6;
+        const xMax = Math.max(1, count - 1) + 0.6;
+        const getX = (idx) => marginLeft + ((idx - xMin) / (xMax - xMin)) * plotWidth;
+
+        // 1. Fondos coloreados según rangos ACMG (conforme a Plot_Bayes_index.ipynb)
+        const bands = [
+            { min: 0.990, max: 1.050, color: isLight ? 'rgba(239, 68, 68, 0.18)' : 'rgba(239, 68, 68, 0.22)', label: 'Pathogenic (0.990-1.000)', stroke: isLight ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.45)' },
+            { min: 0.900, max: 0.990, color: isLight ? 'rgba(240, 128, 128, 0.22)' : 'rgba(248, 113, 113, 0.18)', label: 'Likely Pathogenic [0.900-0.990]', stroke: isLight ? 'rgba(240, 128, 128, 0.35)' : 'rgba(248, 113, 113, 0.35)' },
+            { min: 0.100, max: 0.900, color: isLight ? 'rgba(240, 230, 140, 0.28)' : 'rgba(234, 179, 8, 0.14)', label: 'VUS [0.100-0.900)', stroke: isLight ? 'rgba(202, 138, 4, 0.25)' : 'rgba(234, 179, 8, 0.25)' },
+            { min: 0.001, max: 0.100, color: isLight ? 'rgba(144, 238, 144, 0.25)' : 'rgba(34, 197, 94, 0.16)', label: 'Likely Benign [0.001-0.100)', stroke: isLight ? 'rgba(34, 197, 94, 0.35)' : 'rgba(34, 197, 94, 0.35)' },
+            { min: -0.050, max: 0.001, color: isLight ? 'rgba(34, 197, 94, 0.20)' : 'rgba(16, 185, 129, 0.22)', label: 'Benign (0.000-0.001)', stroke: isLight ? 'rgba(22, 163, 74, 0.35)' : 'rgba(16, 185, 129, 0.45)' }
+        ];
+
+        bands.forEach(b => {
+            const yTop = getY(b.max);
+            const yBottom = getY(b.min);
+            const h = yBottom - yTop;
+            ctx.fillStyle = b.color;
+            ctx.fillRect(marginLeft, yTop, plotWidth, h);
+
+            ctx.strokeStyle = b.stroke;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(marginLeft, yTop);
+            ctx.lineTo(marginLeft + plotWidth, yTop);
+            ctx.stroke();
+        });
+
+        // 2. Líneas de rejilla discontinua (Y ticks)
+        const yTicks = [0.001, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9, 0.99];
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.35)' : 'rgba(255, 255, 255, 0.16)';
+        ctx.lineWidth = 1;
+
+        yTicks.forEach(tVal => {
+            const y = getY(tVal);
+            ctx.beginPath();
+            ctx.moveTo(marginLeft, y);
+            ctx.lineTo(marginLeft + plotWidth, y);
+            ctx.stroke();
+        });
+
+        // Rejilla vertical para puntos
+        sequence.forEach(pt => {
+            const x = getX(pt.xIndex);
+            ctx.beginPath();
+            ctx.moveTo(x, marginTop);
+            ctx.lineTo(x, marginTop + plotHeight);
+            ctx.stroke();
+        });
+        ctx.setLineDash([]); // restaurar trazo continuo
+
+        // 3. Marco de los ejes
+        ctx.strokeStyle = isLight ? '#334155' : 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1.4;
+        ctx.strokeRect(marginLeft, marginTop, plotWidth, plotHeight);
+
+        // 4. Etiquetas de Y
+        ctx.fillStyle = isLight ? '#334155' : '#cbd5e1';
+        ctx.font = '500 10.5px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        yTicks.forEach(tVal => {
+            const y = getY(tVal);
+            ctx.beginPath();
+            ctx.moveTo(marginLeft - 5, y);
+            ctx.lineTo(marginLeft, y);
+            ctx.stroke();
+
+            const textVal = tVal === 0.001 ? '0.001' : (tVal.toString().length <= 4 ? tVal.toString() : tVal.toFixed(2));
+            ctx.fillText(textVal, marginLeft - 8, y);
+        });
+
+        // 5. Etiquetas de X con rotación 45° completamente por debajo del eje X
+        sequence.forEach(pt => {
+            const x = getX(pt.xIndex);
+            const y = marginTop + plotHeight;
+
+            // Muesca del tick
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + 5);
+            ctx.stroke();
+
+            ctx.save();
+            ctx.translate(x, y + 8);
+            ctx.rotate((45 * Math.PI) / 180);
+            ctx.fillStyle = isLight ? '#0f172a' : '#e2e8f0';
+            ctx.font = '600 9.5px Outfit, Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pt.xLabel, 0, 0);
+            ctx.restore();
+        });
+
+        // 6. Puntos de dispersión (Scatter sin línea continua, idéntico a la notebook)
+        sequence.forEach((pt) => {
+            const x = getX(pt.xIndex);
+            const y = getY(pt.post_p);
+            const nodeColor = this.getColorForProb(pt.post_p);
+
+            // Glow sutil en modo oscuro
+            if (!isLight) {
+                ctx.save();
+                ctx.shadowColor = nodeColor;
+                ctx.shadowBlur = 10;
+            }
+
+            ctx.beginPath();
+            ctx.arc(x, y, 7.5, 0, 2 * Math.PI);
+            ctx.fillStyle = nodeColor;
+            ctx.fill();
+
+            if (!isLight) {
+                ctx.restore();
+            }
+
+            // Anillo negro de borde
+            ctx.beginPath();
+            ctx.arc(x, y, 7.5, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+
+            // Posición de etiquetas a la derecha del punto (i + 0.12, val + 0.02 / val - 0.04)
+            const posX = getX(pt.xIndex + 0.12);
+            const posYVal = getY(pt.post_p + 0.02);
+            const posYText = getY(pt.post_p - 0.04);
+
+            // Etiqueta superior (valor numérico de Post_P)
+            ctx.fillStyle = isLight ? '#0f172a' : '#ffffff';
+            ctx.font = 'bold 10px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(pt.post_p.toFixed(3), posX, posYVal);
+
+            // Etiqueta inferior (nombre del criterio ingresado)
+            ctx.fillStyle = isLight ? '#334155' : '#cbd5e1';
+            ctx.font = 'italic 9.5px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(pt.label, posX, posYText);
+        });
+
+        // 8. Barra de color en el lateral derecho
+        const cbarX = displayWidth - marginRight + 22;
+        const cbarY = marginTop + 15;
+        const cbarWidth = 14;
+        const cbarHeight = plotHeight - 30;
+
+        const cbarGrad = ctx.createLinearGradient(0, cbarY + cbarHeight, 0, cbarY);
+        cbarGrad.addColorStop(0.0, '#16a34a');
+        cbarGrad.addColorStop(0.1, '#84cc16');
+        cbarGrad.addColorStop(0.5, '#eab308');
+        cbarGrad.addColorStop(0.8, '#f97316');
+        cbarGrad.addColorStop(0.9, '#ef4444');
+        cbarGrad.addColorStop(1.0, '#dc2626');
+
+        ctx.fillStyle = cbarGrad;
+        ctx.fillRect(cbarX, cbarY, cbarWidth, cbarHeight);
+        ctx.strokeStyle = isLight ? '#475569' : 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cbarX, cbarY, cbarWidth, cbarHeight);
+
+        // Texto vertical de la barra de color
+        ctx.save();
+        ctx.translate(cbarX + cbarWidth + 18, cbarY + cbarHeight / 2);
+        ctx.rotate((90 * Math.PI) / 180);
+        ctx.fillStyle = isLight ? '#334155' : '#94a3b8';
+        ctx.font = '600 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Post_P Parcial', 0, 0);
+        ctx.restore();
+
+        // 9. Leyenda de franjas ACMG en la esquina superior izquierda
+        const legX = marginLeft + 8;
+        const legY = marginTop + 8;
+        const legW = 205;
+        const legH = 86;
+
+        ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.88)';
+        ctx.fillRect(legX, legY, legW, legH);
+        ctx.strokeStyle = isLight ? '#94a3b8' : 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(legX, legY, legW, legH);
+
+        bands.forEach((b, idx) => {
+            const rowY = legY + 11 + idx * 15;
+            ctx.fillStyle = b.color.replace('0.18', '0.9').replace('0.14', '0.9').replace('0.16', '0.9').replace('0.20', '0.9').replace('0.22', '0.9').replace('0.25', '0.9').replace('0.28', '0.9');
+            ctx.fillRect(legX + 8, rowY - 5, 10, 10);
+            ctx.strokeStyle = isLight ? '#475569' : '#ffffff';
+            ctx.strokeRect(legX + 8, rowY - 5, 10, 10);
+
+            ctx.fillStyle = isLight ? '#0f172a' : '#e2e8f0';
+            ctx.font = '500 8.8px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(b.label, legX + 23, rowY);
+        });
+
+        // 10. Título y Etiquetas de los Ejes
+        ctx.fillStyle = isLight ? '#0f172a' : '#f8fafc';
+        ctx.font = 'bold 12px Outfit, Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`Mapeo Integral del Modelo Bayesiano ACMG (Prior_P = ${this.prior_p.toFixed(2)}, Odds_VSt = ${this.odds_vst.toFixed(1)})`, marginLeft + plotWidth / 2, 12);
+
+        ctx.fillStyle = isLight ? '#334155' : '#94a3b8';
+        ctx.font = '600 10px Inter, sans-serif';
+        ctx.fillText('Combinación Progresiva de Criterios Clínicos (ACMG / AMP)', marginLeft + plotWidth / 2, displayHeight - 16);
+
+        ctx.save();
+        ctx.translate(16, marginTop + plotHeight / 2);
+        ctx.rotate((-90 * Math.PI) / 180);
+        ctx.fillStyle = isLight ? '#334155' : '#94a3b8';
+        ctx.font = '600 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Probabilidad de Patogenicidad a Posteriori (Post_P)', 0, 0);
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    toDataURL(themeOverride = null) {
+        const theme = themeOverride || this.theme;
+        if (theme === this.theme) {
+            const canvas = this.getCanvas();
+            return canvas ? canvas.toDataURL('image/png') : '';
+        }
+
+        // Renderizado offscreen con el tema especificado
+        const offCanvas = document.createElement('canvas');
+        this.render(this.lastActiveTags, this.lastHasBA1, offCanvas, theme);
+        const dataUrl = offCanvas.toDataURL('image/png');
+        return dataUrl;
+    }
+
+    downloadPNG(filename = 'bayes_acmg_progression.png') {
+        const dataUrl = this.toDataURL();
+        if (!dataUrl) return;
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
 class TortaApp {
     constructor() {
         this.criteriaState = new Map();
@@ -519,6 +893,8 @@ class TortaApp {
         this.revelScore = 0.500;
         this.molConsequence = 'missense';
         this.inheritanceModel = 'AD';
+
+        this.bayesPlotter = new ACMGCanvasPlotter('bayesPlotCanvas');
 
         this.dom = {
             svg: document.getElementById('acmgWheelSvg'),
@@ -563,9 +939,6 @@ class TortaApp {
         this.criteriaState.forEach(state => {
             state.selected = false;
         });
-
-        const inputs = document.querySelectorAll('.crit-checkbox');
-        inputs.forEach(chk => chk.checked = false);
 
         const cards = document.querySelectorAll('.criterion-item-card');
         cards.forEach(card => card.classList.remove('selected'));
@@ -671,6 +1044,9 @@ class TortaApp {
 
         if (stepNum === 7) {
             this.renderWheelSVG();
+            if (this.bayesPlotter) {
+                this.bayesPlotter.render(this.currentActiveTags || [], this.currentVerdictObj?.verdict?.includes('BA1') || false);
+            }
         }
 
         // Al mostrar el paso de segregación, sincronizar herencia
@@ -1131,7 +1507,7 @@ class TortaApp {
                 const state = this.criteriaState.get(crit.code);
 
                 const card = document.createElement('div');
-                card.className = `criterion-item-card ${state.selected ? 'selected' : ''}`;
+                card.className = `criterion-item-card ${crit.type} ${state.selected ? 'selected' : ''}`;
                 card.dataset.code = crit.code;
 
                 const top = document.createElement('div');
@@ -1139,15 +1515,6 @@ class TortaApp {
 
                 const left = document.createElement('div');
                 left.className = 'crit-card-left';
-
-                const chk = document.createElement('input');
-                chk.type = 'checkbox';
-                chk.className = 'crit-checkbox';
-                chk.checked = state.selected;
-                chk.addEventListener('change', e => {
-                    e.stopPropagation();
-                    this.toggleCriterionSelect(crit.code);
-                });
 
                 const badge = document.createElement('span');
                 badge.className = `crit-code-badge ${crit.type === 'pathogenic' ? 'pathogenic' : 'benign'}`;
@@ -1163,7 +1530,6 @@ class TortaApp {
                     title.textContent = crit.title;
                 }
 
-                left.appendChild(chk);
                 left.appendChild(badge);
                 left.appendChild(title);
 
@@ -1199,8 +1565,7 @@ class TortaApp {
 
                 card.addEventListener('click', (e) => {
                     if (card.classList.contains('disabled-rule')) return;
-                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'OPTION') {
-                        chk.checked = !chk.checked;
+                    if (e.target.tagName !== 'SELECT' && e.target.tagName !== 'OPTION') {
                         this.toggleCriterionSelect(crit.code);
                     }
                 });
@@ -1373,8 +1738,6 @@ class TortaApp {
                 card.dataset.disabledReason = reason;
                 if (state?.selected) {
                     state.selected = false;
-                    const chk = card.querySelector('.crit-checkbox');
-                    if (chk) chk.checked = false;
                     card.classList.remove('selected');
                 }
             } else {
@@ -1396,8 +1759,6 @@ class TortaApp {
                 state.selected = false;
                 const card = document.querySelector(`.criterion-item-card[data-code="${code}"]`);
                 if (card) {
-                    const chk = card.querySelector('.crit-checkbox');
-                    if (chk) chk.checked = false;
                     card.classList.remove('selected');
                 }
                 if (reason) this.showConflictToast(reason, 'block');
@@ -1592,8 +1953,33 @@ class TortaApp {
         this.currentVerdictObj = verdictObj;
         this.currentTotal = total;
 
+        if (this.bayesPlotter) {
+            this.bayesPlotter.render(activeTags, hasBA1);
+        }
+
         if (document.getElementById('step7') && !document.getElementById('step7').classList.contains('hidden')) {
             this.renderWheelSVG();
+        }
+    }
+
+    setPlotTheme(theme) {
+        if (this.bayesPlotter) {
+            this.bayesPlotter.setTheme(theme);
+        }
+        const darkBtn = document.getElementById('themeDarkBtn');
+        const lightBtn = document.getElementById('themeLightBtn');
+        if (darkBtn && lightBtn) {
+            darkBtn.classList.toggle('active', theme === 'dark');
+            lightBtn.classList.toggle('active', theme === 'light');
+        }
+    }
+
+    downloadBayesPlot() {
+        const gene = document.getElementById('inputGene')?.value.trim() || 'ACMG';
+        const hgvs = document.getElementById('inputHGVS')?.value.trim() || 'Bayes';
+        const filename = `ACMG_Bayes_${gene}_${hgvs}.png`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+        if (this.bayesPlotter) {
+            this.bayesPlotter.downloadPNG(filename);
         }
     }
 
@@ -1646,6 +2032,11 @@ class TortaApp {
                 this.currentVerdictObj.class.includes('likely-benign') ? 'badge-likely-benign' : 'badge-vus'
             );
             document.getElementById('repProb').textContent = this.currentVerdictObj.prob;
+        }
+
+        const plotImg = document.getElementById('repBayesPlotImg');
+        if (plotImg && this.bayesPlotter) {
+            plotImg.src = this.bayesPlotter.toDataURL('light'); // Siempre tema blanco para el informe imprimible / PDF
         }
 
         modal.classList.add('active');
