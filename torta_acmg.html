@@ -439,6 +439,21 @@
                 <div class="wizard-step hidden" id="step2">
                     <div class="step-header-badge"><i class="fa-solid fa-2"></i> PASO 2 — FRECUENCIA POBLACIONAL</div>
                     <h2 class="step-title">3. Frecuencia en Población (gnomAD / TOPMed)</h2>
+
+                    <!-- Botón para abrir modal CardioDB -->
+                    <button type="button" onclick="window.tortaApp.openCardioModal()" style="display:flex; align-items:center; gap:12px; width:100%; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.4); border-radius:14px; padding:16px 20px; cursor:pointer; margin-bottom:18px; text-align:left; transition:background 0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.14)'" onmouseout="this.style.background='rgba(16,185,129,0.08)'">
+                        <i class="fa-solid fa-heart-pulse" style="font-size:1.4rem; color:var(--neon-emerald);"></i>
+                        <div>
+                            <div style="font-weight:700; color:var(--neon-emerald); font-size:0.95rem;">Calculadora de Frecuencia Alélica (CardioDB / ClinGen BS1-PM2)</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Algoritmo de Whiffin et al. (2017) — Calcula el Max CAF, FAF 95% y umbrales de gnomAD</div>
+                        </div>
+                        <div id="cardioResultBadge" style="margin-left:auto; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); border-radius:8px; padding:6px 12px; text-align:center; min-width:90px;">
+                            <div style="font-size:0.65rem; color:var(--text-muted);">Diagnóstico</div>
+                            <div id="cardioBadgeTotal" style="font-size:1.1rem; font-weight:900; color:var(--neon-emerald);">--</div>
+                            <div id="cardioBadgeCode" style="font-size:0.62rem; color:var(--text-muted);">Sin calcular</div>
+                        </div>
+                    </button>
+
                     <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:14px;">
                         Seleccione los criterios poblacionales aplicables según los umbrales de frecuencia (MAF):
                     </p>
@@ -450,6 +465,21 @@
                 <div class="wizard-step hidden" id="step3">
                     <div class="step-header-badge"><i class="fa-solid fa-3"></i> PASO 3 — EFECTO MOLECULAR</div>
                     <h2 class="step-title">1. Efecto Molecular & Predictores In Silico</h2>
+
+                    <!-- Botón para abrir modal Asistente PVS1 (Exclusivo para variante Truncante / LOF) -->
+                    <button type="button" id="pvs1AssistantBtn" onclick="window.tortaApp.openPVS1Modal()" style="display:none; align-items:center; gap:12px; width:100%; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.4); border-radius:14px; padding:16px 20px; cursor:pointer; margin-bottom:18px; text-align:left; transition:background 0.2s;" onmouseover="this.style.background='rgba(167,139,250,0.14)'" onmouseout="this.style.background='rgba(167,139,250,0.08)'">
+                        <i class="fa-solid fa-dna" style="font-size:1.4rem; color:var(--neon-purple);"></i>
+                        <div>
+                            <div style="font-weight:700; color:var(--neon-purple); font-size:0.95rem;">Asistente de Decisión PVS1 (ClinGen SVI / Abou Tayoun 2018)</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Árbol algorítmico para variantes truncantes: NMD, splicing ±1,2, codón de inicio y CNVs</div>
+                        </div>
+                        <div id="pvs1ResultBadge" style="margin-left:auto; background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.4); border-radius:8px; padding:6px 12px; text-align:center; min-width:90px;">
+                            <div style="font-size:0.65rem; color:var(--text-muted);">PVS1 Calibrado</div>
+                            <div id="pvs1BadgeTotal" style="font-size:1.1rem; font-weight:900; color:var(--neon-purple);">--</div>
+                            <div id="pvs1BadgeCode" style="font-size:0.62rem; color:var(--text-muted);">Sin evaluar</div>
+                        </div>
+                    </button>
+
                     <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:14px;">
                         Seleccione los criterios moleculares o calibre la evaluación in silico computacional (PP3 / BP4):
                     </p>
@@ -1152,6 +1182,559 @@
     </table>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL CALCULADORA CARDIODB / WHIFFIN ET AL. (2017)
+══════════════════════════════════════════════════════════════ -->
+<style>
+#cardioModal {
+    display:none; position:fixed; inset:0; z-index:9000;
+    background:rgba(0,0,0,0.78); backdrop-filter:blur(5px);
+    align-items:center; justify-content:center; overflow-y:auto; padding:20px 16px;
+}
+#cardioModal.open { display:flex; }
+.cardio-modal-box {
+    background:linear-gradient(135deg,#061814 0%,#0f291e 100%);
+    border:1px solid rgba(16,185,129,0.4); border-radius:20px;
+    width:100%; max-width:960px; max-height:90vh; display:flex; flex-direction:column;
+    box-shadow:0 24px 80px rgba(0,0,0,0.85); overflow:hidden;
+    animation: cardioSlideIn 0.25s ease;
+}
+@keyframes cardioSlideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+
+.cardio-modal-header {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 24px; border-bottom:1px solid rgba(16,185,129,0.2); background:rgba(6,24,20,0.7);
+}
+.cardio-modal-title { font-size:1.05rem; font-weight:800; color:var(--neon-emerald); display:flex; align-items:center; gap:10px; }
+
+.cardio-modal-body-grid {
+    display:grid; grid-template-columns: 1fr 320px; flex:1; overflow:hidden; min-height:0;
+}
+@media (max-width: 768px) {
+    .cardio-modal-body-grid { grid-template-columns: 1fr; overflow-y:auto; }
+}
+
+.cardio-form-col {
+    padding:20px 24px; overflow-y:auto; display:flex; flex-direction:column; gap:16px;
+}
+
+.cardio-sidebar-col {
+    background:rgba(4,18,14,0.9); border-left:1px solid rgba(16,185,129,0.2);
+    padding:20px; display:flex; flex-direction:column; justify-content:space-between; overflow-y:auto;
+}
+
+.cardio-field-group {
+    background:rgba(16,185,129,0.04); border:1px solid rgba(16,185,129,0.18);
+    border-radius:12px; padding:14px 16px;
+}
+.cardio-field-title {
+    font-size:0.82rem; font-weight:700; color:var(--neon-emerald); margin-bottom:8px;
+    display:flex; justify-content:space-between; align-items:center;
+}
+.cardio-slider-val { font-weight:800; color:var(--neon-cyan); font-size:0.88rem; }
+.cardio-input-row { display:flex; gap:10px; align-items:center; }
+.cardio-input {
+    width:100%; background:rgba(2,12,10,0.8); border:1px solid rgba(16,185,129,0.3);
+    border-radius:8px; padding:8px 12px; color:var(--text-primary); font-size:0.88rem; box-sizing:border-box;
+}
+.cardio-input:focus { outline:none; border-color:var(--neon-emerald); }
+
+.cardio-toggle-group { display:flex; gap:6px; background:rgba(0,0,0,0.4); padding:4px; border-radius:10px; border:1px solid rgba(16,185,129,0.2); }
+.cardio-toggle-btn {
+    flex:1; background:transparent; border:none; color:var(--text-muted); padding:6px 10px;
+    border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer; transition:all 0.2s;
+}
+.cardio-toggle-btn.active {
+    background:rgba(16,185,129,0.25); color:var(--neon-emerald); border:1px solid rgba(16,185,129,0.4);
+}
+</style>
+
+<div id="cardioModal">
+  <div class="cardio-modal-box">
+    <!-- Header -->
+    <div class="cardio-modal-header">
+      <div class="cardio-modal-title">
+        <i class="fa-solid fa-heart-pulse"></i>
+        <span>Calculadora de Frecuencia Alélica (CardioDB / ClinGen BS1-PM2)</span>
+      </div>
+      <button class="pp1-close-btn" onclick="window.tortaApp.closeCardioModal()">✕</button>
+    </div>
+
+    <!-- Body Grid -->
+    <div class="cardio-modal-body-grid">
+      <!-- Columna de Configuración -->
+      <div class="cardio-form-col">
+        <!-- Preset Selector -->
+        <div class="cardio-field-group">
+          <div class="cardio-field-title">
+            <span><i class="fa-solid fa-bookmark"></i> Preset de Enfermedad / Gen</span>
+          </div>
+          <select id="cardioPresetSelect" class="cardio-input" onchange="window.tortaApp.onCardioPresetChange(this.value)">
+            <option value="custom">-- Personalizado (Valores libres) --</option>
+            <option value="hcm" selected>Miocardiopatía Hipertrófica (HCM - 1/500, AD)</option>
+            <option value="lqts">Síndrome de QT Largo (LQTS - 1/2000, AD)</option>
+            <option value="brugada">Síndrome de Brugada (BrS - 1/5000, AD)</option>
+            <option value="hboc">Cáncer Mama/Ovario Hereditario (BRCA1/2 - 1/400, AD)</option>
+            <option value="adpkd">Poliquistosis Renal (ADPKD - 1/1000, AD)</option>
+            <option value="marfan">Síndrome de Marfan (FBN1 - 1/5000, AD)</option>
+            <option value="cf">Fibrosis Quística (CFTR - 1/2500, AR)</option>
+          </select>
+        </div>
+
+        <!-- Modelo de Herencia (Sincronizado con variable global) -->
+        <div class="cardio-field-group">
+          <div class="cardio-field-title">
+            <span><i class="fa-solid fa-code-fork"></i> Modelo de Herencia</span>
+            <span style="font-size:0.7rem; color:var(--text-muted);">Sincronizado globalmente</span>
+          </div>
+          <div class="cardio-toggle-group">
+            <button type="button" id="cardioInhAD" class="cardio-toggle-btn active" onclick="window.tortaApp.setCardioInheritance('AD')">Autosómico Dominante (AD)</button>
+            <button type="button" id="cardioInhAR" class="cardio-toggle-btn" onclick="window.tortaApp.setCardioInheritance('AR')">Autosómico Recesivo (AR)</button>
+          </div>
+        </div>
+
+        <!-- Parámetros de la Enfermedad -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <!-- Prevalencia -->
+          <div class="cardio-field-group">
+            <div class="cardio-field-title">
+              <span>Prevalencia (1 en N)</span>
+              <span class="cardio-slider-val" id="cardioPrevDisplay">1 / 500</span>
+            </div>
+            <input type="number" id="cardioPrevInput" class="cardio-input" min="1" max="1000000" value="500" oninput="window.tortaApp.calculateCardioAF()">
+          </div>
+
+          <!-- Penetrancia -->
+          <div class="cardio-field-group">
+            <div class="cardio-field-title">
+              <span>Penetrancia</span>
+              <span class="cardio-slider-val" id="cardioPenDisplay">50%</span>
+            </div>
+            <input type="range" id="cardioPenSlider" min="0.05" max="1.0" step="0.05" value="0.50" oninput="window.tortaApp.calculateCardioAF()" style="width:100%; accent-color:var(--neon-emerald);">
+          </div>
+        </div>
+
+        <!-- Heterogeneidades -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <!-- Heterogeneidad Genética -->
+          <div class="cardio-field-group">
+            <div class="cardio-field-title">
+              <span>Het. Genética (Gen)</span>
+              <span class="cardio-slider-val" id="cardioGenHetDisplay">30%</span>
+            </div>
+            <input type="range" id="cardioGenHetSlider" min="0.01" max="1.0" step="0.01" value="0.30" oninput="window.tortaApp.calculateCardioAF()" style="width:100%; accent-color:var(--neon-emerald);">
+          </div>
+
+          <!-- Heterogeneidad Alélica -->
+          <div class="cardio-field-group">
+            <div class="cardio-field-title">
+              <span>Het. Alélica (Variante)</span>
+              <span class="cardio-slider-val" id="cardioAlleleHetDisplay">5%</span>
+            </div>
+            <input type="range" id="cardioAlleleHetSlider" min="0.005" max="1.0" step="0.005" value="0.05" oninput="window.tortaApp.calculateCardioAF()" style="width:100%; accent-color:var(--neon-emerald);">
+          </div>
+        </div>
+
+        <!-- Datos de gnomAD / Cohorte de Referencia -->
+        <div class="cardio-field-group">
+          <div class="cardio-field-title">
+            <span><i class="fa-solid fa-database"></i> Datos de Referencia (gnomAD / Cohorte)</span>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div>
+              <label style="font-size:0.72rem; color:var(--text-muted); display:block; margin-bottom:4px;">Allele Number (AN total)</label>
+              <input type="number" id="cardioGnomadAN" class="cardio-input" value="251496" min="100" step="1000" oninput="window.tortaApp.calculateCardioAF()">
+            </div>
+            <div>
+              <label style="font-size:0.72rem; color:var(--text-muted); display:block; margin-bottom:4px;">Allele Count observado (AC)</label>
+              <input type="number" id="cardioGnomadAC" class="cardio-input" value="0" min="0" step="1" oninput="window.tortaApp.calculateCardioAF()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna de Resultados / Veredicto -->
+      <div class="cardio-sidebar-col">
+        <div>
+          <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;">
+            Métricas de Frecuencia Alélica
+          </div>
+
+          <!-- Max CAF -->
+          <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:12px; text-align:center; margin-bottom:10px;">
+            <div style="font-size:0.68rem; color:#94a3b8; text-transform:uppercase;">Max Credible Allele Freq (Max CAF)</div>
+            <div id="cardioResCAF" style="font-size:1.6rem; font-weight:900; color:var(--neon-emerald); line-height:1.2;">0.000030</div>
+            <div id="cardioResCAFPercent" style="font-size:0.75rem; color:var(--neon-cyan); margin-top:2px;">(0.0030% / 1 en 33,333)</div>
+          </div>
+
+          <!-- FAF 95% & Max AC -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+            <div style="background:rgba(2,12,10,0.6); border:1px solid rgba(16,185,129,0.2); border-radius:8px; padding:8px; text-align:center;">
+              <div style="font-size:0.62rem; color:#94a3b8;">FAF 95% (Poisson)</div>
+              <div id="cardioResFAF" style="font-size:0.88rem; font-weight:800; color:#f8fafc;">0.000045</div>
+            </div>
+            <div style="background:rgba(2,12,10,0.6); border:1px solid rgba(16,185,129,0.2); border-radius:8px; padding:8px; text-align:center;">
+              <div style="font-size:0.62rem; color:#94a3b8;">AC Máx. Permitido</div>
+              <div id="cardioResMaxAC" style="font-size:0.88rem; font-weight:800; color:#f8fafc;">≤ 12 alelos</div>
+            </div>
+          </div>
+
+          <!-- Diagnóstico ACMG -->
+          <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+            Diagnóstico Clínico ACMG
+          </div>
+          <div id="cardioVerdictBox" style="background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.4); border-radius:10px; padding:12px; text-align:center; margin-bottom:12px;">
+            <div id="cardioVerdictCode" style="font-size:1.1rem; font-weight:900; color:#4ade80;">PM2_Supporting (+1p)</div>
+            <div id="cardioVerdictDesc" style="font-size:0.72rem; color:#cbd5e1; margin-top:4px; line-height:1.4;">
+              Ausente o frecuencia extremadamente baja compatible con patogenicidad.
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="pp1-btn pp1-btn-success" onclick="window.tortaApp.applyCardioResult()" style="width:100%; padding:11px 14px; font-size:0.9rem; font-weight:800; box-shadow:0 4px 14px rgba(16,185,129,0.35);">
+          ✓ Aplicar Criterio a la Guía
+        </button>
+      </div>
+    </div>
+  </div>
+</div><!-- /#cardioModal -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL ASISTENTE DE DECISIÓN PVS1 (ABOU TAYOUN ET AL., 2018)
+══════════════════════════════════════════════════════════════ -->
+<style>
+#pvs1Modal {
+    display:none; position:fixed; inset:0; z-index:9000;
+    background:rgba(0,0,0,0.78); backdrop-filter:blur(5px);
+    align-items:center; justify-content:center; overflow-y:auto; padding:20px 16px;
+}
+#pvs1Modal.open { display:flex; }
+.pvs1-modal-box {
+    background:linear-gradient(135deg,#130e26 0%,#1e1438 100%);
+    border:1px solid rgba(167,139,250,0.4); border-radius:20px;
+    width:100%; max-width:960px; max-height:90vh; display:flex; flex-direction:column;
+    box-shadow:0 24px 80px rgba(0,0,0,0.85); overflow:hidden;
+    animation: pvs1SlideIn 0.25s ease;
+}
+@keyframes pvs1SlideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+
+.pvs1-modal-header {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 24px; border-bottom:1px solid rgba(167,139,250,0.2); background:rgba(19,14,38,0.7);
+}
+.pvs1-modal-title { font-size:1.05rem; font-weight:800; color:var(--neon-purple); display:flex; align-items:center; gap:10px; }
+
+.pvs1-modal-body-grid {
+    display:grid; grid-template-columns: 1fr 320px; flex:1; overflow:hidden; min-height:0;
+}
+@media (max-width: 768px) {
+    .pvs1-modal-body-grid { grid-template-columns: 1fr; overflow-y:auto; }
+}
+
+.pvs1-form-col {
+    padding:20px 24px; overflow-y:auto; display:flex; flex-direction:column; justify-content:space-between;
+}
+
+.pvs1-sidebar-col {
+    background:rgba(15,10,30,0.9); border-left:1px solid rgba(167,139,250,0.2);
+    padding:20px; display:flex; flex-direction:column; justify-content:space-between; overflow-y:auto;
+}
+
+.pvs1-step-panel { display:none; }
+.pvs1-step-panel.visible { display:block; animation: pvs1FadeIn 0.2s ease; }
+@keyframes pvs1FadeIn { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:translateX(0)} }
+
+.pvs1-option-card {
+    background:rgba(167,139,250,0.06); border:1px solid rgba(167,139,250,0.2);
+    border-radius:12px; padding:14px; margin-bottom:10px; cursor:pointer; transition:all 0.2s;
+    display:flex; align-items:flex-start; gap:12px;
+}
+.pvs1-option-card:hover {
+    background:rgba(167,139,250,0.12); border-color:var(--neon-purple);
+}
+.pvs1-option-card.selected {
+    background:rgba(167,139,250,0.2); border-color:var(--neon-purple); box-shadow:0 0 12px rgba(167,139,250,0.25);
+}
+.pvs1-option-title { font-size:0.88rem; font-weight:800; color:#f8fafc; margin-bottom:3px; }
+.pvs1-option-desc { font-size:0.75rem; color:#94a3b8; line-height:1.4; }
+</style>
+
+<div id="pvs1Modal">
+  <div class="pvs1-modal-box">
+    <!-- Header -->
+    <div class="pvs1-modal-header">
+      <div class="pvs1-modal-title">
+        <i class="fa-solid fa-dna"></i>
+        <span>Asistente de Decisión PVS1 (ClinGen SVI / Abou Tayoun 2018)</span>
+      </div>
+      <button class="pp1-close-btn" onclick="window.tortaApp.closePVS1Modal()">✕</button>
+    </div>
+
+    <!-- Body Grid -->
+    <div class="pvs1-modal-body-grid">
+      <!-- Columna de Preguntas / Ramas -->
+      <div class="pvs1-form-col">
+        <div>
+          <!-- Steps Navigation -->
+          <div class="pp1-steps-nav" style="border-bottom-color:rgba(167,139,250,0.2);">
+            <div class="pp1-step-dot active" id="pvs1Dot1" onclick="window.tortaApp.setPVS1Step(1)">
+              <div class="pp1-step-dot-circle" style="border-color:var(--neon-purple); color:var(--neon-purple);">1</div>
+              <div class="pp1-step-dot-label">Mecanismo LOF</div>
+            </div>
+            <div class="pp1-step-connector" style="background:rgba(167,139,250,0.2);"></div>
+            <div class="pp1-step-dot" id="pvs1Dot2" onclick="window.tortaApp.setPVS1Step(2)">
+              <div class="pp1-step-dot-circle">2</div>
+              <div class="pp1-step-dot-label">Tipo Variante</div>
+            </div>
+            <div class="pp1-step-connector" style="background:rgba(167,139,250,0.2);"></div>
+            <div class="pp1-step-dot" id="pvs1Dot3" onclick="window.tortaApp.setPVS1Step(3)">
+              <div class="pp1-step-dot-circle">3</div>
+              <div class="pp1-step-dot-label">Calibración</div>
+            </div>
+            <div class="pp1-step-connector" style="background:rgba(167,139,250,0.2);"></div>
+            <div class="pp1-step-dot" id="pvs1Dot4" onclick="window.tortaApp.setPVS1Step(4)">
+              <div class="pp1-step-dot-circle">4</div>
+              <div class="pp1-step-dot-label">Veredicto</div>
+            </div>
+          </div>
+
+          <!-- PASO 1: Mecanismo LOF -->
+          <div class="pvs1-step-panel visible" id="pvs1Panel1">
+            <div class="pp1-step-title" style="color:var(--neon-purple);">
+              <span>¿Es la Pérdida de Función (LOF) un mecanismo establecido de patogenicidad?</span>
+            </div>
+            <p style="font-size:0.78rem; color:#94a3b8; margin-bottom:14px;">
+              Verifique si el gen es sensible a dosis (Haploinsuficiencia, ClinGen Dosage Score 3, pLI ≥ 0.9, LOEUF &lt; 0.35) y si existen variantes nulas patogénicas reportadas.
+            </p>
+
+            <div class="pvs1-option-card selected" id="pvs1OptLofYes" onclick="window.tortaApp.selectPVS1Lof(true)">
+              <input type="radio" name="pvs1Lof" checked style="accent-color:var(--neon-purple); margin-top:3px;">
+              <div>
+                <div class="pvs1-option-title">SÍ — LOF / Haploinsuficiencia es el mecanismo patogénico</div>
+                <div class="pvs1-option-desc">El gen causa enfermedad por pérdida de una copia funcional (gen haploinsuficiente o recesivo con pérdida de función).</div>
+              </div>
+            </div>
+
+            <div class="pvs1-option-card" id="pvs1OptLofNo" onclick="window.tortaApp.selectPVS1Lof(false)">
+              <input type="radio" name="pvs1Lof" style="accent-color:var(--neon-purple); margin-top:3px;">
+              <div>
+                <div class="pvs1-option-title">NO — Mecanismo por Ganancia de Función / Dominante Negativo / No Establecido</div>
+                <div class="pvs1-option-desc">Variantes nulas no están asociadas a patogenicidad en este gen. <strong>PVS1 no es aplicable (0 pts)</strong>.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASO 2: Tipo de Variante Nula -->
+          <div class="pvs1-step-panel" id="pvs1Panel2">
+            <div class="pp1-step-title" style="color:var(--neon-purple);">
+              <span>Seleccione la naturaleza molecular de la variante nula:</span>
+            </div>
+
+            <div class="pvs1-option-card selected" id="pvs1TypeNonsense" onclick="window.tortaApp.selectPVS1Type('nonsense')">
+              <input type="radio" name="pvs1Type" checked style="accent-color:var(--neon-purple); margin-top:3px;">
+              <div>
+                <div class="pvs1-option-title">1. Nonsense o Frameshift (Codón de parada prematuro - PTC)</div>
+                <div class="pvs1-option-desc">Genera un codón de terminación anticipado dentro de la secuencia codificante.</div>
+              </div>
+            </div>
+
+            <div class="pvs1-option-card" id="pvs1TypeSplice" onclick="window.tortaApp.selectPVS1Type('splice')">
+              <input type="radio" name="pvs1Type" style="accent-color:var(--neon-purple); margin-top:3px;">
+              <div>
+                <div class="pvs1-option-title">2. Splicing Canónico (±1, ±2)</div>
+                <div class="pvs1-option-desc">Afecta los dinucleótidos esenciales GT/AG donor o acceptor de corte y empalme.</div>
+              </div>
+            </div>
+
+            <div class="pvs1-option-card" id="pvs1TypeMet" onclick="window.tortaApp.selectPVS1Type('met')">
+              <input type="radio" name="pvs1Type" style="accent-color:var(--neon-purple); margin-top:3px;">
+              <div>
+                <div class="pvs1-option-title">3. Codón de Inicio (p.Met1? / ATG)</div>
+                <div class="pvs1-option-desc">Altera el codón de inicio de traducción metionina.</div>
+              </div>
+            </div>
+
+            <div class="pvs1-option-card" id="pvs1TypeCnv" onclick="window.tortaApp.selectPVS1Type('cnv')">
+              <input type="radio" name="pvs1Type" style="accent-color:var(--neon-purple); margin-top:3px;">
+              <div>
+                <div class="pvs1-option-title">4. Deleción de Exón(es) / CNV Intragénica</div>
+                <div class="pvs1-option-desc">Deleción de uno o múltiples exones o gen completo.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASO 3: Calibración Específica por Rama -->
+          <div class="pvs1-step-panel" id="pvs1Panel3">
+            <!-- Rama A: Nonsense / Frameshift -->
+            <div id="pvs1BranchNonsense">
+              <div class="pp1-step-title" style="color:var(--neon-purple);">
+                <span>Evaluación de NMD y Relevancia de Exón</span>
+              </div>
+
+              <div class="pvs1-option-card selected" id="pvs1NmdYesCrit" onclick="window.tortaApp.selectPVS1SubOption('nmd_yes_crit')">
+                <input type="radio" name="pvs1SubNonsense" checked style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">NMD Predicho (>50 pb antes de última unión exón-exón) en Exón Esencial</div>
+                  <div class="pvs1-option-desc">El ARNm sufrirá degradación mediada por nonsense (NMD) en transcrito canónico/MANE Select. → <strong>PVS1 (Very Strong, +8p)</strong></div>
+                </div>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1NmdYesAlt" onclick="window.tortaApp.selectPVS1SubOption('nmd_yes_alt')">
+                <input type="radio" name="pvs1SubNonsense" style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">NMD Predicho en Exón Alternativo / Baja Expresión</div>
+                  <div class="pvs1-option-desc">Ocurre en una isoforma menor o tejido con baja expresión del exón. → <strong>PVS1_Moderate (+2p)</strong></div>
+                </div>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1NmdNoCrit" onclick="window.tortaApp.selectPVS1SubOption('nmd_no_crit')">
+                <input type="radio" name="pvs1SubNonsense" style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Escapa a NMD (Último exón) pero Trunca Dominio Crítico / >10% C-terminal</div>
+                  <div class="pvs1-option-desc">La proteína truncada expresada pierde un dominio funcional crítico y hay patogénicas aguas abajo. → <strong>PVS1_Strong (+4p)</strong></div>
+                </div>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1NmdNoNoncrit" onclick="window.tortaApp.selectPVS1SubOption('nmd_no_noncrit')">
+                <input type="radio" name="pvs1SubNonsense" style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Escapa a NMD (Último exón) en Región No Crítica (&lt;10%)</div>
+                  <div class="pvs1-option-desc">No compromete dominios esenciales y existen variantes benignas en la cola 3'. → <strong>PVS1_Supporting (+1p) / No Aplica</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rama B: Splicing ±1,2 -->
+            <div id="pvs1BranchSplice" style="display:none;">
+              <div class="pp1-step-title" style="color:var(--neon-purple);">
+                <span>Consecuencia Estructural del Salto de Exón</span>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1SpliceOutFrame" onclick="window.tortaApp.selectPVS1SubOption('splice_out_frame')">
+                <input type="radio" name="pvs1SubSplice" checked style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Salto de Exón Fuera de Marco (Out-of-Frame) con NMD en Exón Esencial</div>
+                  <div class="pvs1-option-desc">Provoca cambio del marco de lectura que desencadena NMD. → <strong>PVS1 (Very Strong, +8p)</strong></div>
+                </div>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1SpliceInFrameCrit" onclick="window.tortaApp.selectPVS1SubOption('splice_in_frame_crit')">
+                <input type="radio" name="pvs1SubSplice" style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Salto de Exón en Marco (In-Frame) que Elimina Dominio Crítico</div>
+                  <div class="pvs1-option-desc">Deleción en marco que suprime un dominio funcional o estructural crítico. → <strong>PVS1_Strong (+4p)</strong></div>
+                </div>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1SpliceInFrameNoncrit" onclick="window.tortaApp.selectPVS1SubOption('splice_in_frame_noncrit')">
+                <input type="radio" name="pvs1SubSplice" style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Salto de Exón en Marco en Región No Crítica / Exón Menor</div>
+                  <div class="pvs1-option-desc">Conserva el resto de la proteína sin afectar dominios funcionales clave. → <strong>PVS1_Moderate (+2p)</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rama C: Met1 -->
+            <div id="pvs1BranchMet" style="display:none;">
+              <div class="pp1-step-title" style="color:var(--neon-purple);">
+                <span>Evaluación de Codones de Inicio Alternativos</span>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1MetNoAlt" onclick="window.tortaApp.selectPVS1SubOption('met_no_alt')">
+                <input type="radio" name="pvs1SubMet" checked style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Sin Codón ATG Alternativo Funcional Aguas Abajo</div>
+                  <div class="pvs1-option-desc">La alteración de Met1 impide la iniciación o el siguiente ATG elimina dominios críticos. → <strong>PVS1_Moderate (+2p)</strong></div>
+                </div>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1MetAltExists" onclick="window.tortaApp.selectPVS1SubOption('met_alt_exists')">
+                <input type="radio" name="pvs1SubMet" style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Existe Codón ATG Alternativo en Marco Cercano y Funcional</div>
+                  <div class="pvs1-option-desc">La traducción puede reanudarse conservando la mayor parte de la proteína activa. → <strong>PVS1_Supporting (+1p)</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rama D: CNV Exónica -->
+            <div id="pvs1BranchCnv" style="display:none;">
+              <div class="pp1-step-title" style="color:var(--neon-purple);">
+                <span>Extensión y Características de la Deleción</span>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1CnvMulti" onclick="window.tortaApp.selectPVS1SubOption('cnv_multi')">
+                <input type="radio" name="pvs1SubCnv" checked style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Deleción Multiexónica o Gen Completo en Gen Haploinsuficiente</div>
+                  <div class="pvs1-option-desc">Pérdida de múltiples exones o gen entero donde LOF es patogénico. → <strong>PVS1 (Very Strong, +8p)</strong></div>
+                </div>
+              </div>
+
+              <div class="pvs1-option-card" id="pvs1CnvSingleCrit" onclick="window.tortaApp.selectPVS1SubOption('cnv_single_crit')">
+                <input type="radio" name="pvs1SubCnv" style="accent-color:var(--neon-purple); margin-top:3px;">
+                <div>
+                  <div class="pvs1-option-title">Deleción en Marco de un Exón Crítico</div>
+                  <div class="pvs1-option-desc">Deleción en marco que suprime un dominio funcional esencial. → <strong>PVS1_Strong (+4p)</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASO 4: Resumen y Veredicto -->
+          <div class="pvs1-step-panel" id="pvs1Panel4">
+            <div class="pp1-step-title" style="color:var(--neon-purple);">
+              <span>Resumen de la Decisión Algorítmica PVS1</span>
+            </div>
+            <div id="pvs1SummaryCard" style="background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.3); border-radius:12px; padding:16px; font-size:0.85rem; line-height:1.6; color:#e2e8f0;">
+              <!-- Se llena dinámicamente -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones de Navegación del Wizard -->
+        <div style="display:flex; justify-content:space-between; margin-top:20px; border-top:1px solid rgba(167,139,250,0.2); padding-top:14px;">
+          <button type="button" id="pvs1BtnPrev" class="pp1-btn" onclick="window.tortaApp.prevPVS1Step()" style="display:none; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.2); color:#cbd5e1;">
+            ← Anterior
+          </button>
+          <button type="button" id="pvs1BtnNext" class="pp1-btn" onclick="window.tortaApp.nextPVS1Step()" style="margin-left:auto; background:linear-gradient(135deg,var(--neon-purple) 0%,#7c3aed 100%); color:#ffffff; font-weight:700;">
+            Siguiente →
+          </button>
+        </div>
+      </div>
+
+      <!-- Columna de Resultados / Veredicto -->
+      <div class="pvs1-sidebar-col">
+        <div>
+          <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;">
+            Fuerza PVS1 Calibrada
+          </div>
+
+          <!-- Box de Fuerza -->
+          <div style="background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.4); border-radius:12px; padding:14px; text-align:center; margin-bottom:12px;">
+            <div id="pvs1SidebarStrength" style="font-size:1.25rem; font-weight:900; color:var(--neon-purple); line-height:1.2;">Very Strong</div>
+            <div id="pvs1SidebarPoints" style="font-size:1.8rem; font-weight:900; color:var(--neon-cyan); margin-top:4px;">+8 pts</div>
+            <div id="pvs1SidebarCode" style="font-size:0.7rem; color:#cbd5e1; margin-top:4px;">PVS1 (ClinGen SVI 2018)</div>
+          </div>
+
+          <!-- Justificación Clínica -->
+          <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+            Justificación Clínica
+          </div>
+          <div id="pvs1SidebarJustification" style="background:rgba(15,10,30,0.6); border:1px solid rgba(167,139,250,0.2); border-radius:8px; padding:10px; font-size:0.72rem; color:#94a3b8; line-height:1.4; max-height:160px; overflow-y:auto;">
+            Variante nula con degradación NMD en gen con mecanismo de haploinsuficiencia establecido.
+          </div>
+        </div>
+
+        <button type="button" class="pp1-btn pp1-btn-success" onclick="window.tortaApp.applyPVS1Result()" style="width:100%; padding:11px 14px; font-size:0.9rem; font-weight:800; box-shadow:0 4px 14px rgba(167,139,250,0.35);">
+          ✓ Aplicar Criterio PVS1
+        </button>
+      </div>
+    </div>
+  </div>
+</div><!-- /#pvs1Modal -->
 
 <script src="torta_app.js"></script>
 </body>

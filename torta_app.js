@@ -211,9 +211,12 @@ const ACMG_SECTORS = [
                 title: 'Frecuencia mayor a la esperada para la enfermedad',
                 defaultStrength: 'Strong',
                 defaultPts: -4,
-                allowedStrengths: [{ label: 'Strong (-4p)', pts: -4, strength: 'Strong' }],
+                allowedStrengths: [
+                    { label: 'Strong (-4p)', pts: -4, strength: 'Strong' },
+                    { label: 'Supporting (-1p)', pts: -1, strength: 'Supporting' }
+                ],
                 type: 'benign',
-                desc: 'Frecuencia alélica supera la frecuencia máxima esperada.',
+                desc: 'Frecuencia alélica supera la frecuencia máxima esperada (Max CAF / FAF 95%).',
                 papers: [{ name: 'BS1_2017.pdf', label: 'ClinGen Allele Frequency Thresholds (2017)' }]
             },
             {
@@ -1002,6 +1005,26 @@ class TortaApp {
             if (panel) panel.style.display = 'none';
         }
 
+        // Control de visibilidad del Asistente PVS1 (Exclusivo para variantes Truncantes / LOF)
+        const pvs1Btn = document.getElementById('pvs1AssistantBtn');
+        if (pvs1Btn) {
+            pvs1Btn.style.display = (mc === 'lof') ? 'flex' : 'none';
+        }
+
+        // Si la variante no es Truncante/LOF, deseleccionar PVS1
+        if (mc !== 'lof') {
+            const pvs1St = this.criteriaState.get('PVS1');
+            if (pvs1St && pvs1St.selected) {
+                pvs1St.selected = false;
+            }
+            const pvs1BadgeTot = document.getElementById('pvs1BadgeTotal');
+            const pvs1BadgeCd = document.getElementById('pvs1BadgeCode');
+            if (pvs1BadgeTot && pvs1BadgeCd) {
+                pvs1BadgeTot.textContent = '--';
+                pvs1BadgeCd.textContent = 'Sin evaluar';
+            }
+        }
+
         // Actualizar slider según predictor actual
         this.updateSliderForPredictor();
     }
@@ -1061,12 +1084,14 @@ class TortaApp {
     }
 
     // ── PP3 Panel toggle (chevron animado) ─────────────────────────────
-    togglePP3Panel() {
+    togglePP3Panel(forceOpen) {
         const body    = document.getElementById('pp3PanelBody');
         const chevron = document.getElementById('pp3PanelChevron');
         const tableBtn= document.getElementById('pp3TableToggleBtn');
         if (!body) return;
-        const isOpen = body.style.display !== 'none';
+        let isOpen = body.style.display !== 'none';
+        if (forceOpen === true) isOpen = false;
+        else if (forceOpen === false) isOpen = true;
         body.style.display = isOpen ? 'none' : 'block';
         if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
         if (tableBtn) tableBtn.style.display = isOpen ? 'none' : 'inline-flex';
@@ -1085,6 +1110,485 @@ class TortaApp {
     closePP1Submodal(id) {
         const el = document.getElementById(id);
         if (el) el.classList.remove('active');
+    }
+
+    // ── Calculadora CardioDB / Whiffin et al. (2017) ──────────────────────────
+    openCardioModal() {
+        const modal = document.getElementById('cardioModal');
+        if (!modal) return;
+        this.setCardioInheritance(this.inheritanceModel || 'AD');
+        this.calculateCardioAF();
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeCardioModal() {
+        const modal = document.getElementById('cardioModal');
+        if (modal) modal.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    setCardioInheritance(model) {
+        this.inheritanceModel = model;
+        const adBtn = document.getElementById('cardioInhAD');
+        const arBtn = document.getElementById('cardioInhAR');
+        if (adBtn && arBtn) {
+            adBtn.classList.toggle('active', model === 'AD');
+            arBtn.classList.toggle('active', model === 'AR');
+        }
+        // Sincronizar selectInheritance global
+        const selInh = document.getElementById('selectInheritance');
+        if (selInh) selInh.value = model;
+        this.calculateCardioAF();
+    }
+
+    onCardioPresetChange(val) {
+        const presets = {
+            hcm: { prevN: 500, pen: 0.50, genHet: 0.30, alleleHet: 0.05, inh: 'AD' },
+            lqts: { prevN: 2000, pen: 0.60, genHet: 0.35, alleleHet: 0.05, inh: 'AD' },
+            brugada: { prevN: 5000, pen: 0.30, genHet: 0.20, alleleHet: 0.05, inh: 'AD' },
+            hboc: { prevN: 400, pen: 0.70, genHet: 0.30, alleleHet: 0.05, inh: 'AD' },
+            adpkd: { prevN: 1000, pen: 0.95, genHet: 0.85, alleleHet: 0.02, inh: 'AD' },
+            marfan: { prevN: 5000, pen: 0.95, genHet: 0.90, alleleHet: 0.02, inh: 'AD' },
+            cf: { prevN: 2500, pen: 1.00, genHet: 1.00, alleleHet: 0.70, inh: 'AR' }
+        };
+
+        const p = presets[val];
+        if (p) {
+            const prevInput = document.getElementById('cardioPrevInput');
+            const penInput = document.getElementById('cardioPenSlider');
+            const genHetInput = document.getElementById('cardioGenHetSlider');
+            const alleleHetInput = document.getElementById('cardioAlleleHetSlider');
+            if (prevInput) prevInput.value = p.prevN;
+            if (penInput) penInput.value = p.pen;
+            if (genHetInput) genHetInput.value = p.genHet;
+            if (alleleHetInput) alleleHetInput.value = p.alleleHet;
+            this.setCardioInheritance(p.inh);
+        }
+        this.calculateCardioAF();
+    }
+
+    calculateCardioAF() {
+        const inh = this.inheritanceModel || 'AD';
+        const prevN = parseFloat(document.getElementById('cardioPrevInput')?.value) || 500;
+        const pen = parseFloat(document.getElementById('cardioPenSlider')?.value) || 0.50;
+        const genHet = parseFloat(document.getElementById('cardioGenHetSlider')?.value) || 0.30;
+        const alleleHet = parseFloat(document.getElementById('cardioAlleleHetSlider')?.value) || 0.05;
+        const an = parseFloat(document.getElementById('cardioGnomadAN')?.value) || 251496;
+        const ac = parseFloat(document.getElementById('cardioGnomadAC')?.value) || 0;
+
+        // Actualizar displays
+        const prevDisp = document.getElementById('cardioPrevDisplay');
+        const penDisp = document.getElementById('cardioPenDisplay');
+        const genHetDisp = document.getElementById('cardioGenHetDisplay');
+        const alleleHetDisp = document.getElementById('cardioAlleleHetDisplay');
+
+        if (prevDisp) prevDisp.textContent = `1 / ${Math.round(prevN).toLocaleString()}`;
+        if (penDisp) penDisp.textContent = `${Math.round(pen * 100)}%`;
+        if (genHetDisp) genHetDisp.textContent = `${Math.round(genHet * 100)}%`;
+        if (alleleHetDisp) alleleHetDisp.textContent = `${(alleleHet * 100).toFixed(1)}%`;
+
+        const prev = 1.0 / prevN;
+
+        // Cálculo de Incidencia Alélica y Max CAF (Whiffin et al., 2017)
+        let caf = 0;
+        if (inh === 'AR') {
+            const incidence = (prev * genHet) / pen;
+            caf = Math.sqrt(incidence * alleleHet);
+        } else {
+            const incidence = (prev * genHet * alleleHet) / pen;
+            caf = 1.0 - Math.sqrt(Math.max(0, 1.0 - incidence));
+        }
+
+        // Poisson 95% quantile approximation for Max AC (Whiffin / CardioDB)
+        const lambda = an * caf;
+        const maxAC = Math.max(0, Math.ceil(lambda + 1.645 * Math.sqrt(Math.max(0.1, lambda)) + 0.5));
+        const faf95 = maxAC / an;
+
+        const obsAF = an > 0 ? ac / an : 0;
+
+        // Displays en Sidebar
+        const cafEl = document.getElementById('cardioResCAF');
+        const cafPctEl = document.getElementById('cardioResCAFPercent');
+        const fafEl = document.getElementById('cardioResFAF');
+        const maxAcEl = document.getElementById('cardioResMaxAC');
+
+        if (cafEl) {
+            cafEl.textContent = caf < 0.0001 ? caf.toExponential(3) : caf.toFixed(6);
+        }
+        if (cafPctEl) {
+            const pct = (caf * 100).toFixed(4);
+            const oneIn = Math.round(1 / Math.max(1e-9, caf)).toLocaleString();
+            cafPctEl.textContent = `(${pct}% / 1 en ${oneIn})`;
+        }
+        if (fafEl) {
+            fafEl.textContent = faf95 < 0.0001 ? faf95.toExponential(2) : faf95.toFixed(6);
+        }
+        if (maxAcEl) {
+            maxAcEl.textContent = `≤ ${maxAC} alelos`;
+        }
+
+        // Veredicto ACMG
+        let code = '';
+        let title = '';
+        let desc = '';
+        let strength = 'Strong';
+        let pts = -4;
+
+        if (obsAF >= 0.05) {
+            code = 'BA1';
+            title = 'BA1 (Stand-Alone Benign, -8p)';
+            desc = `Frecuencia alélica observada (${(obsAF*100).toFixed(2)}%) supera el umbral stand-alone de 5.0% en gnomAD.`;
+            strength = 'Stand-alone';
+            pts = -8;
+        } else if (obsAF > caf || (ac > maxAC && ac > 0)) {
+            code = 'BS1';
+            title = 'BS1 (Strong Benign, -4p)';
+            desc = `Frecuencia observada (AC=${ac} en AN=${an.toLocaleString()}, AF=${(obsAF*100).toFixed(4)}%) excede el Max CAF calculado (${(caf*100).toFixed(4)}%).`;
+            strength = 'Strong';
+            pts = -4;
+        } else if (ac === 0 || obsAF <= Math.min(0.0001, caf / 5)) {
+            code = 'PM2_Supporting';
+            title = 'PM2_Supporting (+1p)';
+            desc = `Variante ausente o con frecuencia extremadamente baja (AC=${ac}) dentro del límite patogénico permisible.`;
+            strength = 'Supporting';
+            pts = 1;
+        } else {
+            code = 'NONE';
+            title = 'Frecuencia Intermedia (Sin Criterio)';
+            desc = `Frecuencia en zona indeterminada entre el umbral de rareza PM2 y el Max CAF. No aplica BS1 ni PM2.`;
+            pts = 0;
+        }
+
+        this._currentCardioVerdict = { code, title, desc, caf, faf95, maxAC, obsAF, strength, pts };
+
+        const box = document.getElementById('cardioVerdictBox');
+        const codeEl = document.getElementById('cardioVerdictCode');
+        const descEl = document.getElementById('cardioVerdictDesc');
+
+        if (box && codeEl && descEl) {
+            codeEl.textContent = title;
+            descEl.textContent = desc;
+            if (code === 'BA1' || code === 'BS1') {
+                box.style.background = 'rgba(239,68,68,0.15)';
+                box.style.borderColor = 'rgba(239,68,68,0.4)';
+                codeEl.style.color = '#f87171';
+            } else if (code === 'PM2_Supporting') {
+                box.style.background = 'rgba(34,197,94,0.15)';
+                box.style.borderColor = 'rgba(34,197,94,0.4)';
+                codeEl.style.color = '#4ade80';
+            } else {
+                box.style.background = 'rgba(148,163,184,0.12)';
+                box.style.borderColor = 'rgba(148,163,184,0.3)';
+                codeEl.style.color = '#cbd5e1';
+            }
+        }
+    }
+
+    applyCardioResult() {
+        if (!this._currentCardioVerdict) return;
+        const { code, strength, pts } = this._currentCardioVerdict;
+
+        // Desmarcar excluyentes en frecuencia
+        const freqCodes = ['BA1', 'BS1', 'PM2_Supporting'];
+        freqCodes.forEach(c => {
+            const st = this.criteriaState.get(c);
+            if (st) st.selected = false;
+        });
+
+        if (code && code !== 'NONE') {
+            const target = this.criteriaState.get(code);
+            if (target) {
+                target.selected = true;
+                target.strength = strength;
+                target.pts = pts;
+            }
+        }
+
+        // Actualizar Badge en el Paso 2
+        const badgeTotal = document.getElementById('cardioBadgeTotal');
+        const badgeCode = document.getElementById('cardioBadgeCode');
+        if (badgeTotal && badgeCode) {
+            badgeTotal.textContent = code !== 'NONE' ? code : 'Neutro';
+            badgeCode.textContent = code !== 'NONE' ? (code === 'PM2_Supporting' ? '+1 pt' : (code === 'BA1' ? '-8 pts' : '-4 pts')) : 'Sin criterio';
+        }
+
+        this.updateCalculator();
+        this.renderChecklist();
+        this.closeCardioModal();
+    }
+
+    // ── Asistente de Decisión PVS1 (ClinGen SVI 2018) ──────────────────────────
+    openPVS1Modal() {
+        const modal = document.getElementById('pvs1Modal');
+        if (!modal) return;
+        this._pvs1Step = 1;
+        if (!this._pvs1State) {
+            this._pvs1State = {
+                isLofMechanism: true,
+                variantType: 'nonsense',
+                subOption: 'nmd_yes_crit'
+            };
+        }
+        this.setPVS1Step(1);
+        this.calculatePVS1Verdict();
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    closePVS1Modal() {
+        const modal = document.getElementById('pvs1Modal');
+        if (modal) modal.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    setPVS1Step(step) {
+        this._pvs1Step = step;
+        for (let i = 1; i <= 4; i++) {
+            const panel = document.getElementById(`pvs1Panel${i}`);
+            const dot = document.getElementById(`pvs1Dot${i}`);
+            if (panel) panel.classList.toggle('visible', i === step);
+            if (dot) {
+                dot.classList.toggle('active', i === step);
+                dot.classList.toggle('done', i < step);
+            }
+        }
+
+        const btnPrev = document.getElementById('pvs1BtnPrev');
+        const btnNext = document.getElementById('pvs1BtnNext');
+        if (btnPrev) btnPrev.style.display = step > 1 ? 'inline-block' : 'none';
+        if (btnNext) {
+            btnNext.textContent = step === 4 ? 'Finalizar' : 'Siguiente →';
+            btnNext.style.display = step < 4 ? 'inline-block' : 'none';
+        }
+
+        if (step === 3) {
+            this._updatePVS1BranchVisibility();
+        }
+        if (step === 4) {
+            this._renderPVS1Summary();
+        }
+
+        this.calculatePVS1Verdict();
+    }
+
+    nextPVS1Step() {
+        if (this._pvs1Step === 1 && !this._pvs1State.isLofMechanism) {
+            this.setPVS1Step(4);
+            return;
+        }
+        if (this._pvs1Step < 4) {
+            this.setPVS1Step(this._pvs1Step + 1);
+        }
+    }
+
+    prevPVS1Step() {
+        if (this._pvs1Step === 4 && !this._pvs1State.isLofMechanism) {
+            this.setPVS1Step(1);
+            return;
+        }
+        if (this._pvs1Step > 1) {
+            this.setPVS1Step(this._pvs1Step - 1);
+        }
+    }
+
+    selectPVS1Lof(isLof) {
+        this._pvs1State.isLofMechanism = isLof;
+        const optYes = document.getElementById('pvs1OptLofYes');
+        const optNo = document.getElementById('pvs1OptLofNo');
+        if (optYes) optYes.classList.toggle('selected', isLof);
+        if (optNo) optNo.classList.toggle('selected', !isLof);
+        this.calculatePVS1Verdict();
+    }
+
+    selectPVS1Type(type) {
+        this._pvs1State.variantType = type;
+        const types = ['nonsense', 'splice', 'met', 'cnv'];
+        types.forEach(t => {
+            const card = document.getElementById(`pvs1Type${t.charAt(0).toUpperCase() + t.slice(1)}`);
+            if (card) card.classList.toggle('selected', t === type);
+        });
+
+        // Set default subOption for chosen type
+        if (type === 'nonsense') this._pvs1State.subOption = 'nmd_yes_crit';
+        else if (type === 'splice') this._pvs1State.subOption = 'splice_out_frame';
+        else if (type === 'met') this._pvs1State.subOption = 'met_no_alt';
+        else if (type === 'cnv') this._pvs1State.subOption = 'cnv_multi';
+
+        this._updatePVS1BranchVisibility();
+        this.calculatePVS1Verdict();
+    }
+
+    _updatePVS1BranchVisibility() {
+        const type = this._pvs1State.variantType;
+        const bNon = document.getElementById('pvs1BranchNonsense');
+        const bSpl = document.getElementById('pvs1BranchSplice');
+        const bMet = document.getElementById('pvs1BranchMet');
+        const bCnv = document.getElementById('pvs1BranchCnv');
+        if (bNon) bNon.style.display = type === 'nonsense' ? 'block' : 'none';
+        if (bSpl) bSpl.style.display = type === 'splice' ? 'block' : 'none';
+        if (bMet) bMet.style.display = type === 'met' ? 'block' : 'none';
+        if (bCnv) bCnv.style.display = type === 'cnv' ? 'block' : 'none';
+    }
+
+    selectPVS1SubOption(subOpt) {
+        this._pvs1State.subOption = subOpt;
+        const allCards = document.querySelectorAll('#pvs1Panel3 .pvs1-option-card');
+        allCards.forEach(c => c.classList.remove('selected'));
+        const match = Array.from(allCards).find(c => c.getAttribute('onclick')?.includes(subOpt));
+        if (match) match.classList.add('selected');
+
+        this.calculatePVS1Verdict();
+    }
+
+    calculatePVS1Verdict() {
+        const st = this._pvs1State || { isLofMechanism: true, variantType: 'nonsense', subOption: 'nmd_yes_crit' };
+
+        let strength = 'Very Strong';
+        let pts = 8;
+        let code = 'PVS1';
+        let justification = '';
+
+        if (!st.isLofMechanism) {
+            strength = 'No Aplica';
+            pts = 0;
+            code = 'PVS1_NO_APPLIES';
+            justification = 'La pérdida de función (LOF) no es un mecanismo establecido de patogenicidad para este gen (ej. ganancia de función o dominante negativo). Criterio PVS1 = 0 pts.';
+        } else {
+            switch (st.subOption) {
+                case 'nmd_yes_crit':
+                    strength = 'Very Strong';
+                    pts = 8;
+                    justification = 'Variante truncante con NMD predicho (>50 pb antes de la última unión exón-exón) en transcrito biológicamente relevante (ClinGen PVS1 §1).';
+                    break;
+                case 'nmd_yes_alt':
+                    strength = 'Moderate';
+                    pts = 2;
+                    justification = 'NMD predicho en exón alternativo o tejido con baja expresión del exón. Se degrada a fuerza Moderada (+2p).';
+                    break;
+                case 'nmd_no_crit':
+                    strength = 'Strong';
+                    pts = 4;
+                    justification = 'Escapa a degradación NMD (último exón o penúltimo <50pb) pero trunca un dominio funcional crítico con variantes patogénicas aguas abajo (PVS1_Strong, +4p).';
+                    break;
+                case 'nmd_no_noncrit':
+                    strength = 'Supporting';
+                    pts = 1;
+                    justification = 'Escapa a NMD en región C-terminal no crítica (<10% de la proteína) con variación benigna descrita (PVS1_Supporting, +1p).';
+                    break;
+                case 'splice_out_frame':
+                    strength = 'Very Strong';
+                    pts = 8;
+                    justification = 'Variante en sitio de splicing canónico (±1,2) que predice salto de exón fuera de marco con NMD en exón esencial (PVS1 Very Strong, +8p).';
+                    break;
+                case 'splice_in_frame_crit':
+                    strength = 'Strong';
+                    pts = 4;
+                    justification = 'Salto de exón en marco (in-frame) que interrumpe o suprime un dominio funcional o estructural crítico (PVS1_Strong, +4p).';
+                    break;
+                case 'splice_in_frame_noncrit':
+                    strength = 'Moderate';
+                    pts = 2;
+                    justification = 'Salto de exón en marco en región no crítica que conserva la mayor parte de la proteína (PVS1_Moderate, +2p).';
+                    break;
+                case 'met_no_alt':
+                    strength = 'Moderate';
+                    pts = 2;
+                    justification = 'Variante en codón de inicio (p.Met1?) sin codón ATG alternativo funcional aguas abajo (PVS1_Moderate, +2p).';
+                    break;
+                case 'met_alt_exists':
+                    strength = 'Supporting';
+                    pts = 1;
+                    justification = 'Variante en codón de inicio con codón ATG alternativo en marco que permite la síntesis de una proteína funcional (PVS1_Supporting, +1p).';
+                    break;
+                case 'cnv_multi':
+                    strength = 'Very Strong';
+                    pts = 8;
+                    justification = 'Deleción multiexónica o del gen completo en gen haploinsuficiente establecido (PVS1 Very Strong, +8p).';
+                    break;
+                case 'cnv_single_crit':
+                    strength = 'Strong';
+                    pts = 4;
+                    justification = 'Deleción intragénica en marco de un solo exón que compromete un dominio crítico esencial (PVS1_Strong, +4p).';
+                    break;
+                default:
+                    strength = 'Very Strong';
+                    pts = 8;
+                    justification = 'Variante nula patogénica en gen haploinsuficiente.';
+            }
+        }
+
+        this._currentPvs1Verdict = { strength, pts, code, justification };
+
+        const strEl = document.getElementById('pvs1SidebarStrength');
+        const ptsEl = document.getElementById('pvs1SidebarPoints');
+        const justEl = document.getElementById('pvs1SidebarJustification');
+
+        if (strEl && ptsEl && justEl) {
+            strEl.textContent = strength;
+            ptsEl.textContent = pts > 0 ? `+${pts} pts` : `${pts} pts`;
+            justEl.textContent = justification;
+            if (pts === 8) {
+                ptsEl.style.color = 'var(--neon-cyan)';
+                strEl.style.color = 'var(--neon-purple)';
+            } else if (pts === 4) {
+                ptsEl.style.color = '#60a5fa';
+                strEl.style.color = '#60a5fa';
+            } else if (pts === 2) {
+                ptsEl.style.color = '#fbbf24';
+                strEl.style.color = '#fbbf24';
+            } else if (pts === 1) {
+                ptsEl.style.color = '#a3e635';
+                strEl.style.color = '#a3e635';
+            } else {
+                ptsEl.style.color = '#94a3b8';
+                strEl.style.color = '#94a3b8';
+            }
+        }
+    }
+
+    _renderPVS1Summary() {
+        const summaryCard = document.getElementById('pvs1SummaryCard');
+        if (!summaryCard || !this._currentPvs1Verdict) return;
+        const { strength, pts, justification } = this._currentPvs1Verdict;
+
+        summaryCard.innerHTML = `
+            <div style="font-size:1.1rem; font-weight:800; color:var(--neon-purple); margin-bottom:8px;">
+                Dictamen Final: PVS1 ${strength} (${pts > 0 ? '+' : ''}${pts} pts)
+            </div>
+            <p style="margin-bottom:12px; color:#cbd5e1;">${justification}</p>
+            <div style="background:rgba(0,0,0,0.3); border-radius:8px; padding:10px; font-size:0.75rem; color:#94a3b8;">
+                <strong>Recomendación ClinGen SVI:</strong> Esta asignación de fuerza se calibró conforme a la guía de Abou Tayoun et al. (Human Mutation 2018) y SVI Splicing (Walker et al. 2023). Al pulsar "Aplicar", se configurará la fuerza de PVS1 en la evaluación ACMG.
+            </div>
+        `;
+    }
+
+    applyPVS1Result() {
+        if (!this._currentPvs1Verdict) return;
+        const { strength, pts } = this._currentPvs1Verdict;
+
+        const pvs1State = this.criteriaState.get('PVS1');
+        if (pvs1State) {
+            if (pts > 0) {
+                pvs1State.selected = true;
+                pvs1State.strength = strength;
+                pvs1State.pts = pts;
+            } else {
+                pvs1State.selected = false;
+            }
+        }
+
+        // Actualizar Badge en el Paso 3
+        const badgeTotal = document.getElementById('pvs1BadgeTotal');
+        const badgeCode = document.getElementById('pvs1BadgeCode');
+        if (badgeTotal && badgeCode) {
+            badgeTotal.textContent = pts > 0 ? `+${pts} pts` : '0 pts';
+            badgeCode.textContent = pts > 0 ? `PVS1_${strength}` : 'No aplica';
+        }
+
+        this.updateCalculator();
+        this.renderChecklist();
+        this.closePVS1Modal();
     }
 
     // ── Calculadora PP1/PP4 — MODAL WIZARD ─────────────────────────────
@@ -1535,8 +2039,20 @@ class TortaApp {
 
                 top.appendChild(left);
 
-                // MOSTRAR SELECTOR DE FUERZA/PESO SOLO SI TIENE MÁS DE 1 FUERZA O PAPER DE REVISIÓN ESPECÍFICO
-                if (crit.allowedStrengths && crit.allowedStrengths.length > 1) {
+                // Si es PP3 o BP4 en missense, mostrar badge de cálculo automático In Silico
+                if ((crit.code === 'PP3' || crit.code === 'BP4') && this.molConsequence === 'missense') {
+                    const autoBadge = document.createElement('span');
+                    autoBadge.style.fontSize = '0.78rem';
+                    autoBadge.style.fontWeight = '800';
+                    if (state.selected) {
+                        autoBadge.style.color = crit.type === 'pathogenic' ? 'var(--neon-rose)' : 'var(--neon-emerald)';
+                        autoBadge.textContent = `${state.pts > 0 ? '+' : ''}${state.pts}p (${state.strength}) [Auto In Silico]`;
+                    } else {
+                        autoBadge.style.color = 'var(--text-muted)';
+                        autoBadge.textContent = '0p (Indeterminado / Auto)';
+                    }
+                    top.appendChild(autoBadge);
+                } else if (crit.allowedStrengths && crit.allowedStrengths.length > 1) {
                     const select = document.createElement('select');
                     select.className = 'crit-strength-select';
                     select.innerHTML = crit.allowedStrengths.map(s => 
@@ -1810,16 +2326,32 @@ class TortaApp {
         }
     }
 
-    showCriterionInfo(crit, sector) {
-        if (!this.dom.infoCode) return;
+    renderWheelDetail(crit) {
+        if (!crit) return;
         const state = this.criteriaState.get(crit.code);
-        this.dom.infoCode.textContent = `${crit.code} (${state.pts > 0 ? '+' + state.pts : state.pts} pts)`;
-        this.dom.infoCategory.textContent = `${sector.name}`;
-        if (this.dom.infoTitleFull) this.dom.infoTitleFull.textContent = crit.title;
-        this.dom.infoDesc.textContent = crit.desc;
-        this.dom.infoPapers.innerHTML = crit.papers.map(p => {
-            const meta = PAPER_METADATA_MAP[p.name] || {};
-            const url = meta.doi || `papers/${p.name}`;
+        const nameEl = document.getElementById('wheelSelectedName');
+        const descEl = document.getElementById('wheelSelectedDesc');
+        const badgeEl = document.getElementById('wheelSelectedBadge');
+        const papersEl = document.getElementById('wheelSelectedPapers');
+
+        if (nameEl) nameEl.textContent = `${crit.code} — ${crit.title}`;
+        if (descEl) descEl.textContent = crit.desc;
+        if (badgeEl) {
+            badgeEl.className = `crit-code-badge ${crit.type}`;
+            badgeEl.textContent = `${crit.type === 'pathogenic' ? 'Patogénico' : 'Benigno'} (${state ? state.strength : crit.defaultStrength})`;
+        }
+        if (papersEl && crit.papers) {
+            papersEl.innerHTML = this.renderPaperLinks(crit.papers);
+        }
+    }
+
+    renderPaperLinks(papers) {
+        if (!papers || papers.length === 0) return '';
+        return papers.map(p => {
+            let url = p.url || p.name;
+            if (!url.startsWith('http')) {
+                url = `papers/${url}`;
+            }
             const isDoi = url.startsWith('http');
             const linkText = isDoi ? (url.includes('doi') || url.includes('10.') ? 'Ver DOI / Publicación Oficial' : 'Ver Fuente Oficial') : p.label;
             return `<a href="${url}" target="_blank" class="paper-link" style="margin-right:10px; margin-bottom:6px; display:inline-flex; align-items:center; gap:6px;"><i class="fa-solid ${isDoi ? 'fa-arrow-up-right-from-square' : 'fa-file-pdf'}"></i> ${p.label} (${linkText})</a>`;
@@ -1827,6 +2359,12 @@ class TortaApp {
     }
 
     toggleCriterionSelect(code) {
+        if (this.molConsequence === 'missense' && (code === 'PP3' || code === 'BP4')) {
+            this.showConflictToast(`${code} está vinculado a la Calculadora In Silico (${this.selectedPredictor}). Modifique el valor en el panel superior para calibrar PP3/BP4.`, 'info');
+            this.togglePP3Panel(true);
+            return;
+        }
+
         const state = this.criteriaState.get(code);
         if (!state) return;
 
@@ -1853,6 +2391,35 @@ class TortaApp {
             this.dom.revelPoints.textContent = pts !== 0 ? (pts > 0 ? `+${pts} pts` : `${pts} pts`) : '0 pts';
         }
 
+        // Sincronización automática de PP3 y BP4 con la Calculadora In Silico para missense
+        if (this.molConsequence === 'missense') {
+            const pp3St = this.criteriaState.get('PP3');
+            const bp4St = this.criteriaState.get('BP4');
+
+            if (this.revelEvaluation && this.revelEvaluation.code === 'PP3') {
+                if (pp3St) {
+                    pp3St.selected = true;
+                    pp3St.strength = this.revelEvaluation.strength;
+                    pp3St.pts = this.revelEvaluation.pts;
+                }
+                if (bp4St) {
+                    bp4St.selected = false;
+                }
+            } else if (this.revelEvaluation && this.revelEvaluation.code === 'BP4') {
+                if (bp4St) {
+                    bp4St.selected = true;
+                    bp4St.strength = this.revelEvaluation.strength;
+                    bp4St.pts = this.revelEvaluation.pts;
+                }
+                if (pp3St) {
+                    pp3St.selected = false;
+                }
+            } else {
+                if (pp3St) pp3St.selected = false;
+                if (bp4St) bp4St.selected = false;
+            }
+        }
+
         let total = 0;
         let hasBA1 = false;
         const activeTags = [];
@@ -1860,10 +2427,6 @@ class TortaApp {
         // REGLA PP3 + PM1 <= 4 pts (Strong)
         let pm1Pts = this.criteriaState.get('PM1')?.selected ? this.criteriaState.get('PM1').pts : 0;
         let pp3Pts = this.criteriaState.get('PP3')?.selected ? this.criteriaState.get('PP3').pts : 0;
-
-        if (this.molConsequence === 'missense' && !this.criteriaState.get('PP3')?.selected && !this.criteriaState.get('BP4')?.selected && this.revelEvaluation.pts > 0) {
-            pp3Pts = this.revelEvaluation.pts;
-        }
 
         let adjustedPP3Pts = pp3Pts;
         let adjustedPM1Pts = pm1Pts;
@@ -1899,28 +2462,13 @@ class TortaApp {
                 total += effectivePts;
 
                 let labelTag = code;
-                if ((code === 'PP3' || code === 'BP4') && this.molConsequence === 'missense' && this.revelEvaluation.code) {
+                if ((code === 'PP3' || code === 'BP4') && this.molConsequence === 'missense' && this.revelEvaluation && this.revelEvaluation.code) {
                     labelTag = `${code} [${this.selectedPredictor} = ${this.revelScore.toFixed(3)}]`;
                 }
-
+                
                 activeTags.push({ code: labelTag, pts: effectivePts, strength: state.strength });
             }
         });
-
-        if (this.molConsequence === 'missense' && this.revelEvaluation.code && !this.criteriaState.get('PP3')?.selected && !this.criteriaState.get('BP4')?.selected) {
-            if (this.revelEvaluation.pts !== 0) {
-                let effectiveInSilicoPts = this.revelEvaluation.pts;
-                if (effectiveInSilicoPts > 0 && pm1Pts > 0 && (pm1Pts + effectiveInSilicoPts > 4)) {
-                    effectiveInSilicoPts = Math.max(1, 4 - pm1Pts);
-                }
-                total += effectiveInSilicoPts;
-                activeTags.push({ 
-                    code: `${this.revelEvaluation.code} [${this.selectedPredictor} = ${this.revelScore.toFixed(3)}]`, 
-                    pts: effectiveInSilicoPts,
-                    strength: this.revelEvaluation.strength 
-                });
-            }
-        }
 
         const verdictObj = calculateBayesianVerdict(total, hasBA1);
 
@@ -2045,6 +2593,37 @@ class TortaApp {
     closeReportModal() {
         const modal = document.getElementById('reportModal');
         if (modal) modal.classList.remove('active');
+    }
+
+    resetAllSelections() {
+        this.criteriaState.forEach(st => {
+            st.selected = false;
+        });
+
+        // Reset badges
+        const pp1Total = document.getElementById('pp1BadgeTotal');
+        const pp1Code = document.getElementById('pp1BadgeCode');
+        if (pp1Total && pp1Code) {
+            pp1Total.textContent = '--';
+            pp1Code.textContent = 'Sin calcular';
+        }
+
+        const cardioTotal = document.getElementById('cardioBadgeTotal');
+        const cardioCode = document.getElementById('cardioBadgeCode');
+        if (cardioTotal && cardioCode) {
+            cardioTotal.textContent = '--';
+            cardioCode.textContent = 'Sin calcular';
+        }
+
+        const pvs1Total = document.getElementById('pvs1BadgeTotal');
+        const pvs1Code = document.getElementById('pvs1BadgeCode');
+        if (pvs1Total && pvs1Code) {
+            pvs1Total.textContent = '--';
+            pvs1Code.textContent = 'Sin evaluar';
+        }
+
+        this.updateCalculator();
+        this.renderChecklist();
     }
 }
 
